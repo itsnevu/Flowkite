@@ -234,6 +234,23 @@ export default class MessageManager {
   }
 
   /**
+   * Adds a correction the user typed while the task was already running.
+   *
+   * Framed as the most recent instruction rather than as a new task: the ultimate goal is still the
+   * one they set, and replacing it would throw away the steps already done - which is precisely
+   * what stopping and re-prompting does, and what steering exists to avoid.
+   *
+   * Wrapped as a user request, not as untrusted content: this text came from the panel's composer,
+   * the same place the task itself came from. Still passed through filterExternalContent, because a
+   * user who pastes a block of page text into the box must not be able to smuggle tags through it.
+   */
+  public addSteer(text: string): void {
+    const cleaned = filterExternalContent(text);
+    const content = `The user is watching you work and has just sent this correction: """${cleaned}""". It is their most recent instruction and it overrides your current plan and next step wherever the two disagree. Your ultimate task has NOT changed - keep everything you have already accomplished and apply this from here on.`;
+    this.addMessageWithTokens(new HumanMessage({ content: wrapUserRequest(content, false) }));
+  }
+
+  /**
    * Adds remembered user preferences to the history.
    *
    * These come from the local memory store, not from a page, so they are trusted input and are wrapped

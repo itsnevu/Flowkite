@@ -24,6 +24,7 @@ const COLLECTED = [
   'options_analytics_collect_domains',
   'options_analytics_collect_errors',
   'options_analytics_collect_usage',
+  'options_analytics_collect_feedback',
 ] as const;
 
 const NEVER_COLLECTED = [

@@ -368,6 +368,10 @@
   "options_pricing_output": {
     "message": "$ / 1M 輸出"
   },
+  "options_pricing_cached": {
+    "message": "$ / 1M 快取",
+    "description": "每 100 萬個快取輸入 token 的美元價格；選填。"
+  },
   "options_pricing_empty": {
     "message": "請先在「模型」分頁指派模型，價格列會顯示你使用的模型。"
   },
@@ -1217,6 +1221,99 @@
         "example": "Submit Button"
       }
     }
+  },
+  "act_hover_start": {
+    "message": "將滑鼠移到索引 $INDEX$ 的元素上",
+    "placeholders": {
+      "index": {
+        "content": "$1",
+        "example": "5"
+      }
+    }
+  },
+  "act_hover_ok": {
+    "message": "已將滑鼠移到元素 $INDEX$：$TEXT$",
+    "placeholders": {
+      "index": {
+        "content": "$1",
+        "example": "5"
+      },
+      "text": {
+        "content": "$2",
+        "example": "Account menu"
+      }
+    }
+  },
+  "act_upload_start": {
+    "message": "上傳附加的檔案 $NAME$",
+    "placeholders": {
+      "name": {
+        "content": "$1",
+        "example": "cv.pdf"
+      }
+    }
+  },
+  "act_upload_ok": {
+    "message": "已將 $NAME$ 上傳至 $TARGET$",
+    "placeholders": {
+      "name": {
+        "content": "$1",
+        "example": "cv.pdf"
+      },
+      "target": {
+        "content": "$2",
+        "example": "file input"
+      }
+    }
+  },
+  "act_errors_uploadNoSuchFile": {
+    "message": "沒有名為 $NAME$ 的附加檔案。使用者附加了：$AVAILABLE$",
+    "placeholders": {
+      "name": {
+        "content": "$1",
+        "example": "cv.pdf"
+      },
+      "available": {
+        "content": "$2",
+        "example": "resume.pdf, photo.png"
+      }
+    }
+  },
+  "act_errors_uploadNoFiles": {
+    "message": "使用者沒有為這個任務附加任何檔案，因此沒有東西可以上傳。請他們用輸入框的迴紋針附加檔案。"
+  },
+  "actConfirm_reason_upload": {
+    "message": "這會把你電腦裡的檔案傳送到這個網站。"
+  },
+  "chat_attach_tooMuch": {
+    "message": "這超過 Flowkite 單一任務能保存的量。請移除一個檔案或改附較小的檔案。"
+  },
+  "chat_attach_rejected": {
+    "message": "無法附加 $NAMES$ － 檔案太大或無法讀取。",
+    "placeholders": {
+      "names": {
+        "content": "$1",
+        "example": "photo.png"
+      }
+    }
+  },
+  "exec_steer_applied": {
+    "message": "已套用你的修正：$TEXT$",
+    "placeholders": {
+      "text": {
+        "content": "$1",
+        "example": "pilih yang termurah"
+      }
+    }
+  },
+  "bg_cmd_steer_notRunning": {
+    "message": "只有在任務執行中才能即時指正。"
+  },
+  "chat_buttons_steer": {
+    "message": "傳送修正"
+  },
+  "chat_input_placeholder_running": {
+    "message": "在代理工作時給它指正…"
   },
   "act_click_newTabOpened": {
     "message": "已開啟新分頁，正在切換至該分頁"
@@ -2069,5 +2166,86 @@
   },
   "options_models_providers_placeholders_models": {
     "message": "輸入模型名稱後按 Enter"
+  },
+  "bg_overlay_active": {
+    "message": "Flowkite 執行中",
+    "description": "顯示在代理正在操作的頁面上的標記。"
+  },
+  "bg_overlay_stop": {
+    "message": "停止 Flowkite",
+    "description": "畫在頁面上、用來取消執行中工作的按鈕。"
+  },
+  "chat_feedback_question": {
+    "message": "這次工作階段的 Flowkite 表現如何？"
+  },
+  "chat_feedback_bad": {
+    "message": "不好"
+  },
+  "chat_feedback_fine": {
+    "message": "普通"
+  },
+  "chat_feedback_good": {
+    "message": "很好"
+  },
+  "chat_feedback_dismiss": {
+    "message": "關閉意見回饋提問"
+  },
+  "chat_feedback_thanks": {
+    "message": "謝謝，這很有幫助。"
+  },
+  "options_analytics_collect_feedback": {
+    "message": "你在側邊面板給的工作階段評分（不好／普通／很好）"
+  },
+  "options_pricing_cacheWrite": {
+    "message": "$ / 1M 快取寫入"
+  },
+  "options_pricing_seen": {
+    "message": "用量中出現"
+  },
+  "options_pricing_seenHint": {
+    "message": "你的供應商回報以這個名稱花費了 token。請在此定價，否則它的 token 永遠不會計入美元總額。"
+  },
+  "chat_usage_credit": {
+    "message": "$TOKENS$ 個 token 花了 $AMOUNT$ 額度",
+    "placeholders": {
+      "amount": {
+        "content": "$1",
+        "example": "≈ $0.42"
+      },
+      "tokens": {
+        "content": "$2",
+        "example": "163,148"
+      }
+    }
+  },
+  "chat_usage_creditUnknown": {
+    "message": "$TOKENS$ 個 token · 費用未知，尚未輸入價格",
+    "placeholders": {
+      "tokens": {
+        "content": "$1",
+        "example": "163,148"
+      }
+    }
+  },
+  "chat_usage_rowNoPrice": {
+    "message": "未定價"
+  },
+  "chat_usage_cacheWrite": {
+    "message": "快取寫入 $COUNT$",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "12,400"
+      }
+    }
+  },
+  "options_general_activityOverlay": {
+    "message": "在頁面上顯示 Flowkite"
+  },
+  "options_general_activityOverlay_desc": {
+    "message": "在它操作的每個頁面畫上白色外框、顯示目前動作的標記、Flowkite 移動的游標，以及停止按鈕。預設開啟：分頁自己在打字時，絕不該讓人摸不著頭緒。"
+  },
+  "chat_feedback_report": {
+    "message": "告訴我們哪裡出錯了"
   }
 }

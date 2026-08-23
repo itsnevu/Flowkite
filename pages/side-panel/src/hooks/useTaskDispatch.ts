@@ -31,6 +31,8 @@ interface TaskDispatchProps {
   replayEnabled: boolean;
   isHistoricalSession: boolean;
   isFollowUpMode: boolean;
+  /** whether a task is in flight right now, which is what turns a send into a correction */
+  taskRunning: boolean;
   /** mirrors currentSessionId, so a session created mid-handler is visible before re-render */
   sessionIdRef: MutableRefObject<string | null>;
   setMessages: Dispatch<SetStateAction<Message[]>>;
@@ -72,6 +74,7 @@ export const useTaskDispatch = ({
   replayEnabled,
   isHistoricalSession,
   isFollowUpMode,
+  taskRunning,
   sessionIdRef,
   setMessages,
   setCurrentSessionId,
@@ -248,6 +251,22 @@ export const useTaskDispatch = ({
 
     // Block sending messages in historical sessions
     if (isHistoricalSession) {
+      return;
+    }
+
+    // A send while the agent is working is a correction, not a new task. It keeps everything the
+    // run has already achieved, which is the whole reason for not making the user press Stop.
+    if (taskRunning) {
+      appendMessage({ actor: Actors.USER, content: displayText || text, timestamp: Date.now() }, sessionIdRef.current);
+      try {
+        await sendMessage({ type: 'steer', task: text, taskId: sessionIdRef.current });
+      } catch (err) {
+        appendMessage({
+          actor: Actors.SYSTEM,
+          content: err instanceof Error ? err.message : String(err),
+          timestamp: Date.now(),
+        });
+      }
       return;
     }
 

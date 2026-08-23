@@ -103,6 +103,10 @@ window.buildDomTree = (
 
   const HIGHLIGHT_CONTAINER_ID = 'playwright-highlight-container';
 
+  // The agent's own "Flowkite is active" banner. Drawn into the page the agent is driving, so
+  // without this it would be parsed as page content and the model would reason about its own badge.
+  const ACTIVITY_OVERLAY_ID = 'flowkite-activity-overlay';
+
   // Add a WeakMap cache for XPath strings
   const xpathCache = new WeakMap();
 
@@ -1262,6 +1266,7 @@ window.buildDomTree = (
     if (
       !node ||
       node.id === HIGHLIGHT_CONTAINER_ID ||
+      node.id === ACTIVITY_OVERLAY_ID ||
       (node.nodeType !== Node.ELEMENT_NODE && node.nodeType !== Node.TEXT_NODE)
     ) {
       return null;

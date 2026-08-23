@@ -6,6 +6,7 @@ const emptyTotals = (): TokenUsageTotals => ({
   outputTokens: 0,
   totalTokens: 0,
   cachedInputTokens: 0,
+  cacheCreationInputTokens: 0,
   reasoningOutputTokens: 0,
 });
 
@@ -42,6 +43,10 @@ export class TokenUsageTracker {
     // so the provider's own total is the one to trust; only derive it when the provider omits it.
     entry.totalTokens += usage.total_tokens || (usage.input_tokens ?? 0) + (usage.output_tokens ?? 0);
     entry.cachedInputTokens += usage.input_token_details?.cache_read ?? 0;
+    // Anthropic folds both cache figures into input_tokens and then bills the write at a premium,
+    // so the write has to be countable separately or it silently costs the plain input rate.
+    entry.cacheCreationInputTokens =
+      (entry.cacheCreationInputTokens ?? 0) + (usage.input_token_details?.cache_creation ?? 0);
     entry.reasoningOutputTokens += usage.output_token_details?.reasoning ?? 0;
     this.entries.set(key, entry);
   }
@@ -54,6 +59,7 @@ export class TokenUsageTracker {
       total.outputTokens += entry.outputTokens;
       total.totalTokens += entry.totalTokens;
       total.cachedInputTokens += entry.cachedInputTokens;
+      total.cacheCreationInputTokens = (total.cacheCreationInputTokens ?? 0) + (entry.cacheCreationInputTokens ?? 0);
       total.reasoningOutputTokens += entry.reasoningOutputTokens;
     }
     return {

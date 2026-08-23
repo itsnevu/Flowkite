@@ -2,7 +2,7 @@ import { ActionResult, type AgentContext } from '@src/background/agent/types';
 import { t } from '@extension/i18n';
 import { z } from 'zod';
 import { createLogger } from '@src/background/log';
-import { memoryStore, MemoryScope } from '@extension/storage';
+import { memoryStore, MemoryScope, uploadsStore } from '@extension/storage';
 import { wrapUntrustedContent } from '../messages/utils';
 import { ExecutionState, Actors } from '../event/types';
 import {
@@ -17,6 +17,8 @@ import { READ_ONLY_ACTION_NAMES } from './readOnlyActions';
 import {
   askUserActionSchema,
   clickElementActionSchema,
+  hoverElementActionSchema,
+  uploadFileActionSchema,
   doneActionSchema,
   extractContentActionSchema,
   extractStructuredActionSchema,
@@ -160,6 +162,15 @@ export function buildDynamicActionSchema(actions: Action[]): z.ZodType {
 export class ActionBuilder {
   private readonly context: AgentContext;
   private readonly extractorLLM: BaseChatModel;
+  /**
+   * The name the extractor's tokens are booked under.
+   *
+   * The caller passes the model name the user configured, because that is the name the pricing
+   * page is keyed by. Reading it off the LangChain instance instead - which is what this used to do
+   * - fell back to the literal string 'extractor' whenever the adapter exposed neither `model` nor
+   * `modelName`, and a model booked under a name no price can ever match spends silently.
+   */
+  private readonly extractorModelName: string;
 
   /**
    * @param subtaskOptions - what parallel subtasks need to run on their own; omitted when the caller
@@ -169,9 +180,12 @@ export class ActionBuilder {
     context: AgentContext,
     extractorLLM: BaseChatModel,
     private readonly subtaskOptions?: SubtaskRunnerOptions,
+    extractorModelName?: string,
   ) {
     this.context = context;
     this.extractorLLM = extractorLLM;
+    const llm = extractorLLM as unknown as { model?: string; modelName?: string };
+    this.extractorModelName = extractorModelName || llm.model || llm.modelName || 'extractor';
   }
 
   /**
@@ -333,6 +347,70 @@ export class ActionBuilder {
     );
     actions.push(clickElement);
 
+    const uploadFile = new Action(
+      async (input: z.infer<typeof uploadFileActionSchema.schema>) => {
+        const intent = input.intent || t('act_upload_start', [input.file_name]);
+        this.context.emitEvent(Actors.NAVIGATOR, ExecutionState.ACT_START, intent);
+
+        const file = await uploadsStore.findByName(input.file_name);
+        if (!file) {
+          // Names the model can actually pick from, rather than a bare failure it will retry with
+          // another guess at the same missing file.
+          const available = await uploadsStore.listNames();
+          const msg = available.length
+            ? t('act_errors_uploadNoSuchFile', [input.file_name, available.join(', ')])
+            : t('act_errors_uploadNoFiles');
+          this.context.emitEvent(Actors.NAVIGATOR, ExecutionState.ACT_FAIL, msg);
+          return new ActionResult({ error: msg });
+        }
+
+        const page = await this.context.browserContext.getCurrentPage();
+        // An index is a hint, not a requirement: the visible "Choose file" control is often a label
+        // or a styled button, while the input that takes the file is hidden and unindexed.
+        const elementNode =
+          input.index === null || input.index === undefined
+            ? null
+            : ((await this.resolveElement(page, input.index)) ?? null);
+
+        try {
+          const target = await page.uploadFileToElement(elementNode, file);
+          const msg = t('act_upload_ok', [file.name, target]);
+          logger.info(msg);
+          this.context.emitEvent(Actors.NAVIGATOR, ExecutionState.ACT_OK, msg);
+          return new ActionResult({ extractedContent: msg, includeInMemory: true });
+        } catch (error) {
+          const msg = error instanceof Error ? error.message : String(error);
+          this.context.emitEvent(Actors.NAVIGATOR, ExecutionState.ACT_FAIL, msg);
+          return new ActionResult({ error: msg });
+        }
+      },
+      uploadFileActionSchema,
+      true,
+    );
+    actions.push(uploadFile);
+
+    const hoverElement = new Action(
+      async (input: z.infer<typeof hoverElementActionSchema.schema>) => {
+        const intent = input.intent || t('act_hover_start', [input.index.toString()]);
+        this.context.emitEvent(Actors.NAVIGATOR, ExecutionState.ACT_START, intent);
+
+        const page = await this.context.browserContext.getCurrentPage();
+        const elementNode = await this.resolveElement(page, input.index);
+        if (!elementNode) {
+          throw new Error(t('act_errors_elementNotExist', [input.index.toString()]));
+        }
+
+        await page.hoverElementNode(elementNode);
+        const msg = t('act_hover_ok', [input.index.toString(), elementNode.getAllTextTillNextClickableElement(2)]);
+        logger.info(msg);
+        this.context.emitEvent(Actors.NAVIGATOR, ExecutionState.ACT_OK, msg);
+        return new ActionResult({ extractedContent: msg, includeInMemory: true });
+      },
+      hoverElementActionSchema,
+      true,
+    );
+    actions.push(hoverElement);
+
     const inputText = new Action(
       async (input: z.infer<typeof inputTextActionSchema.schema>) => {
         const intent = input.intent || t('act_inputText_start', [input.index.toString()]);
@@ -426,9 +504,7 @@ export class ActionBuilder {
         ].join('\n');
 
         const output = await this.extractorLLM.invoke(prompt);
-        // Best-effort usage attribution: LangChain models expose their name under different keys.
-        const llm = this.extractorLLM as unknown as { model?: string; modelName?: string };
-        this.context.tokenUsage.record('extractor', llm.model ?? llm.modelName ?? 'extractor', readUsage(output));
+        this.context.tokenUsage.record('extractor', this.extractorModelName, readUsage(output));
 
         let answer = typeof output.content === 'string' ? output.content : JSON.stringify(output.content);
         if (answer.length > EXTRACT_OUTPUT_MAX_CHARS) {
@@ -488,9 +564,7 @@ export class ActionBuilder {
         ].join('\n');
 
         const output = await this.extractorLLM.invoke(prompt);
-        // Best-effort usage attribution: LangChain models expose their name under different keys.
-        const llm = this.extractorLLM as unknown as { model?: string; modelName?: string };
-        this.context.tokenUsage.record('extractor', llm.model ?? llm.modelName ?? 'extractor', readUsage(output));
+        this.context.tokenUsage.record('extractor', this.extractorModelName, readUsage(output));
 
         const answer = typeof output.content === 'string' ? output.content : JSON.stringify(output.content);
         const records = parseRecords(answer);

@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { Actors } from '@extension/storage';
+import { Actors, feedbackPromptStore } from '@extension/storage';
 import { t } from '@extension/i18n';
 import { ExecutionState } from '../types/event';
 import { playTaskChime } from '../chime';
@@ -329,6 +329,10 @@ export const useTaskStateHandler = ({
         if (!taskSettledRef.current) {
           taskSettledRef.current = true;
           finalizeTask({ actor, content: outcome, timestamp });
+          // One tick toward the next "how is this going?". Counted on the same branch that writes
+          // the outcome, so a task that emits two terminal events still counts once, and a replay
+          // of a stored session - which never reaches here - counts not at all.
+          void feedbackPromptStore.recordTaskCompleted().catch(() => undefined);
         }
       }
     },

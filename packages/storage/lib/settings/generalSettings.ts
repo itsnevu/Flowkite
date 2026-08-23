@@ -20,16 +20,20 @@ export const confirmsSensitiveActions = (mode: ApprovalMode): boolean => mode !=
 export const confirmsEveryAction = (mode: ApprovalMode): boolean => mode === 'manual';
 
 /**
- * What the agent draws on the page it is driving.
+ * What grounding the agent draws on the page it is driving.
  *
  * `off` is the default: the page stays exactly as the user would see it themselves. `boxes` is the
  * numbered-overlay grounding that vision mode needs - it is still drawn automatically whenever
  * `useVision` is on, regardless of this setting, because the model reads those numbers off the
  * screenshot.
+ *
+ * A third mode, `cursor`, was declared here and never read by anything. What it described is now
+ * `showActivityOverlay`, which is a separate axis: this setting is about what the *model* needs to
+ * see, that one is about what the *user* needs to see.
  */
-export type AgentOverlayMode = 'off' | 'boxes' | 'cursor';
+export type AgentOverlayMode = 'off' | 'boxes';
 
-export const AGENT_OVERLAY_MODES: readonly AgentOverlayMode[] = ['off', 'boxes', 'cursor'];
+export const AGENT_OVERLAY_MODES: readonly AgentOverlayMode[] = ['off', 'boxes'];
 
 // Interface for general settings configuration
 export interface GeneralSettingsConfig {
@@ -54,6 +58,15 @@ export interface GeneralSettingsConfig {
   autoModeAcknowledged: boolean;
   /** Collect the tabs a task drives into one labelled Chrome tab group, so automated tabs are obvious. */
   groupTaskTabs: boolean;
+  /**
+   * Announce the agent on the page it is driving: a white border, a badge naming the action it is
+   * taking, the cursor it moves, and a stop button.
+   *
+   * On by default, and the default is the point. A tab that types on its own with nothing on screen
+   * to say why is indistinguishable from a compromised browser, so the honest state is the loud one
+   * and turning it off is a choice the user makes deliberately.
+   */
+  showActivityOverlay: boolean;
   /** Play a short chime when a task reaches a final state. */
   soundOnComplete: boolean;
   /**
@@ -86,6 +99,7 @@ export const DEFAULT_GENERAL_SETTINGS: GeneralSettingsConfig = {
   approvalMode: 'planner',
   autoModeAcknowledged: false,
   groupTaskTabs: true,
+  showActivityOverlay: true,
   soundOnComplete: true,
   maxCostUsd: 0,
 };

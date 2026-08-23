@@ -47,10 +47,36 @@ describe('TokenUsageTracker', () => {
     const tracker = new TokenUsageTracker();
     expect(tracker.hasData).toBe(false);
     expect(tracker.snapshot()).toEqual({
-      total: { inputTokens: 0, outputTokens: 0, totalTokens: 0, cachedInputTokens: 0, reasoningOutputTokens: 0 },
+      total: {
+        inputTokens: 0,
+        outputTokens: 0,
+        totalTokens: 0,
+        cachedInputTokens: 0,
+        cacheCreationInputTokens: 0,
+        reasoningOutputTokens: 0,
+      },
       byModel: [],
       unreportedCalls: 0,
     });
+  });
+
+  it('counts cache reads and cache writes apart, since they are billed apart', () => {
+    const tracker = new TokenUsageTracker();
+    tracker.record(
+      'navigator',
+      'claude-good',
+      usage({
+        input_tokens: 1000,
+        output_tokens: 100,
+        total_tokens: 1100,
+        input_token_details: { cache_read: 600, cache_creation: 300 },
+      }),
+    );
+    const [entry] = tracker.snapshot().byModel;
+    expect(entry.cachedInputTokens).toBe(600);
+    expect(entry.cacheCreationInputTokens).toBe(300);
+    // Both are carved out of the input the provider already reported, never added on top of it.
+    expect(entry.inputTokens).toBe(1000);
   });
 
   it('accumulates repeated calls to the same model into one row', () => {

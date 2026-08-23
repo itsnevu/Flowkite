@@ -93,6 +93,8 @@ export interface ChatTokenUsage {
     outputTokens: number;
     totalTokens: number;
     cachedInputTokens: number;
+    /** absent on sessions stored before cache writes were counted separately */
+    cacheCreationInputTokens?: number;
     reasoningOutputTokens: number;
   };
   byModel: Array<{
@@ -103,6 +105,8 @@ export interface ChatTokenUsage {
     outputTokens: number;
     totalTokens: number;
     cachedInputTokens: number;
+    /** absent on sessions stored before cache writes were counted separately */
+    cacheCreationInputTokens?: number;
     reasoningOutputTokens: number;
   }>;
   /** calls whose provider reported nothing, which makes `total` a floor rather than the truth */

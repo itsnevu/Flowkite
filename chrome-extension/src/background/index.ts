@@ -9,6 +9,7 @@ import {
   llmProviderStore,
   analyticsSettingsStore,
   modelPricingStore,
+  SESSION_FEEDBACK_RATINGS,
   schedulesStore,
   APPROVAL_MODES,
 } from '@extension/storage';
@@ -210,10 +211,18 @@ analyticsSettingsStore.subscribe(() => {
 });
 
 // Listen for simple messages (e.g., from options page)
-chrome.runtime.onMessage.addListener(() => {
-  // Handle other message types if needed in the future
-  // Return false if response is not sent asynchronously
-  // return false;
+chrome.runtime.onMessage.addListener((message, sender) => {
+  // Only this extension's own pages may speak here. A web page cannot reach a runtime listener
+  // without an externally_connectable entry, which the manifest does not have, but the check costs
+  // nothing and keeps that guarantee local to the listener rather than to a file two levels away.
+  if (sender.id !== chrome.runtime.id) return false;
+
+  if (message?.type === 'session_feedback' && SESSION_FEEDBACK_RATINGS.includes(message.rating)) {
+    // Best-effort: the strip has already thanked the user, and analytics being off is the normal
+    // case rather than a failure. It drops the rating silently there, which is the point.
+    void analytics.trackSessionFeedback(message.rating);
+  }
+  return false;
 });
 
 // Setup connection listener for long-lived connections (e.g., side panel)
@@ -255,6 +264,18 @@ chrome.runtime.onConnect.addListener(port => {
 
             const result = await withExecutorBusy(() => executor.execute());
             logger.info('new_task execution result', message.tabId, result);
+            break;
+          }
+
+          case 'steer': {
+            if (!message.task) return port.postMessage({ type: 'error', error: t('bg_cmd_newTask_noTask') });
+            // A correction with nothing to correct is a user talking to a run that already ended;
+            // saying so is better than silently dropping what they typed.
+            if (!currentExecutor || !executorBusy) {
+              return port.postMessage({ type: 'error', error: t('bg_cmd_steer_notRunning') });
+            }
+            logger.info('steer', message.task);
+            currentExecutor.steer(message.task);
             break;
           }
 
@@ -546,6 +567,7 @@ async function setupExecutor(
     minimumWaitPageLoadTime: generalSettings.minWaitPageLoad / 1000.0,
     waitBetweenActions: generalSettings.waitBetweenActions / 1000.0,
     agentOverlay: generalSettings.agentOverlay,
+    showActivityOverlay: generalSettings.showActivityOverlay,
     groupTabs: generalSettings.groupTaskTabs,
   });
 
@@ -588,6 +610,9 @@ async function setupExecutor(
     // Snapshotted at task start, like every other setting: a price edited mid-run applies to the
     // next task, not retroactively to a brake that may already have fired.
     modelPricing: await modelPricingStore.getAllPrices(),
+    // The extractor runs on the navigator's model unless configured otherwise, and its tokens have
+    // to be booked under the name the user priced rather than a name read off the adapter.
+    extractorModelName: navigatorModel.modelName,
     agentOptions: {
       maxSteps: generalSettings.maxSteps,
       maxFailures: generalSettings.maxFailures,

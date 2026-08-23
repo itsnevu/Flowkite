@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { FaMicrophone, FaPaperclip, FaArrowUp, FaTimes } from 'react-icons/fa';
 import { AiOutlineLoading3Quarters } from 'react-icons/ai';
 import { t } from '@extension/i18n';
+import { uploadsStore, rejectionReason, MAX_UPLOAD_FILE_BYTES } from '@extension/storage';
 import { findPlaceholders, nextPlaceholder } from '../templates';
 import ApprovalModePicker from './ApprovalModePicker';
 import type { ApprovalMode } from '@extension/storage';
@@ -24,12 +25,36 @@ interface ChatInputProps {
   onApprovalModeSelect: (mode: ApprovalMode) => void;
 }
 
-// File attachment interface
+/**
+ * One attachment in the composer, in one of two roles.
+ *
+ * `text` files are read and pasted into the prompt, which is what a note or a CSV of instructions is
+ * for. `upload` files are never read into the prompt - a 4 MB PDF as base64 would swamp the context
+ * and tell the model nothing - they are parked in session storage for the upload action to hand to a
+ * page's file field, and the prompt learns only their names.
+ */
 interface AttachedFile {
   name: string;
+  /** file text for `text`, base64 bytes for `upload` */
   content: string;
   type: string;
+  role: 'text' | 'upload';
+  /** byte length, for the caps and for the size shown on the chip */
+  size: number;
 }
+
+/** Extensions read into the prompt as text. Anything else becomes an upload attachment instead. */
+const TEXT_EXTENSIONS = ['.txt', '.md', '.markdown', '.json', '.csv', '.log', '.xml', '.yaml', '.yml'];
+
+/** Base64 of an ArrayBuffer, chunked because String.fromCharCode blows the stack on a whole file. */
+const toBase64 = (buffer: ArrayBuffer): string => {
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  }
+  return btoa(binary);
+};
 
 // Shared control recipes — graphite keys sit on the pale canvas, light from the top-left.
 // Each state string carries exactly one un-prefixed shadow so states never fight.
@@ -60,6 +85,7 @@ export default function ChatInput({
 }: ChatInputProps) {
   const [text, setText] = useState('');
   const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
+  const [attachError, setAttachError] = useState<string | null>(null);
   /** Unfilled template slots in the draft. While any remain, send is held and Tab walks them. */
   const placeholders = useMemo(() => findPlaceholders(text), [text]);
   const isSendButtonDisabled = useMemo(
@@ -148,8 +174,17 @@ export default function ChatInput({
 
         // Security: Clearly separate user input from file content
         // The background service will sanitize file content using guardrails
-        if (attachedFiles.length > 0) {
-          const fileContents = attachedFiles
+        const textFiles = attachedFiles.filter(file => file.role === 'text');
+        const uploadFiles = attachedFiles.filter(file => file.role === 'upload');
+
+        // Written before the task is sent, so the action can never race the panel and find the
+        // store still empty. Replaces rather than appends: these belong to the task being sent.
+        void uploadsStore.setFiles(
+          uploadFiles.map(file => ({ name: file.name, mimeType: file.type, data: file.content, size: file.size })),
+        );
+
+        if (textFiles.length > 0) {
+          const fileContents = textFiles
             .map(file => {
               // Tag file content for background service to identify and sanitize
               return `\n\n<flowkite_file_content type="file" name="${file.name}">\n${file.content}\n</flowkite_file_content>`;
@@ -160,8 +195,16 @@ export default function ChatInput({
           messageContent = trimmedText
             ? `${trimmedText}\n\n<flowkite_attached_files>${fileContents}</flowkite_attached_files>`
             : `<flowkite_attached_files>${fileContents}</flowkite_attached_files>`;
+        }
 
-          // Create display version with only filenames (for UI)
+        // The model is told the names and nothing else. It cannot read these files, and saying so
+        // outright is cheaper than letting it discover that by trying.
+        if (uploadFiles.length > 0) {
+          const names = uploadFiles.map(file => file.name).join(', ');
+          messageContent = `${messageContent}\n\n<flowkite_attached_uploads>${names}</flowkite_attached_uploads>`;
+        }
+
+        if (attachedFiles.length > 0) {
           const fileList = attachedFiles.map(file => `📎 ${file.name}`).join('\n');
           displayContent = trimmedText ? `${trimmedText}\n\n${fileList}` : fileList;
         }
@@ -169,6 +212,7 @@ export default function ChatInput({
         onSendMessage(messageContent, displayContent);
         setText('');
         setAttachedFiles([]);
+        setAttachError(null);
       }
     },
     [text, placeholders, selectSpan, attachedFiles, onSendMessage],
@@ -208,53 +252,67 @@ export default function ChatInput({
     fileInputRef.current?.click();
   }, []);
 
-  const handleFileChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
+  const handleFileChange = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const files = e.target.files;
+      if (!files || files.length === 0) return;
 
-    const newFiles: AttachedFile[] = [];
-    const allowedTypes = ['.txt', '.md', '.markdown', '.json', '.csv', '.log', '.xml', '.yaml', '.yml'];
+      const newFiles: AttachedFile[] = [];
+      const rejected: string[] = [];
 
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-      const fileExt = '.' + file.name.split('.').pop()?.toLowerCase();
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const fileExt = '.' + file.name.split('.').pop()?.toLowerCase();
+        const isText = TEXT_EXTENSIONS.includes(fileExt);
 
-      // Check if file type is allowed
-      if (!allowedTypes.includes(fileExt)) {
-        console.warn(`File type ${fileExt} not supported. Only text-based files are allowed.`);
-        continue;
+        // Text goes into the prompt, so it is held to the old 1 MB line; an upload never enters the
+        // context at all, so it is held to the session-storage budget instead.
+        const limit = isText ? 1024 * 1024 : MAX_UPLOAD_FILE_BYTES;
+        if (file.size > limit) {
+          rejected.push(file.name);
+          continue;
+        }
+
+        try {
+          newFiles.push({
+            name: file.name,
+            content: isText ? await file.text() : toBase64(await file.arrayBuffer()),
+            type: file.type || (isText ? 'text/plain' : 'application/octet-stream'),
+            role: isText ? 'text' : 'upload',
+            size: file.size,
+          });
+        } catch (error) {
+          console.error(`Error reading file ${file.name}:`, error);
+          rejected.push(file.name);
+        }
       }
 
-      // Check file size (limit to 1MB)
-      if (file.size > 1024 * 1024) {
-        console.warn(`File ${file.name} is too large. Maximum size is 1MB.`);
-        continue;
+      const merged = [...attachedFiles, ...newFiles];
+      const uploads = merged.filter(file => file.role === 'upload');
+      // Checked against the merged set rather than this batch, or three separate drops of 3 MB each
+      // would each pass on their own and together overrun the store.
+      const overflow = rejectionReason(
+        uploads.map(file => ({ name: file.name, mimeType: file.type, data: file.content, size: file.size })),
+      );
+
+      if (overflow) {
+        setAttachError(t('chat_attach_tooMuch'));
+      } else {
+        setAttachedFiles(merged);
+        setAttachError(rejected.length ? t('chat_attach_rejected', [rejected.join(', ')]) : null);
       }
 
-      try {
-        const content = await file.text();
-        newFiles.push({
-          name: file.name,
-          content,
-          type: file.type || 'text/plain',
-        });
-      } catch (error) {
-        console.error(`Error reading file ${file.name}:`, error);
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
       }
-    }
-
-    if (newFiles.length > 0) {
-      setAttachedFiles(prev => [...prev, ...newFiles]);
-    }
-
-    // Reset file input
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
-  }, []);
+    },
+    [attachedFiles],
+  );
 
   const handleRemoveFile = useCallback((index: number) => {
     setAttachedFiles(prev => prev.filter((_, i) => i !== index));
+    setAttachError(null);
   }, []);
 
   return (
@@ -265,6 +323,12 @@ export default function ChatInput({
         className={`rounded-slab bg-canvas-sunk p-2.5 shadow-neu-inset-sm transition-shadow duration-200 ease-press focus-within:shadow-neu-inset ${disabled ? 'cursor-not-allowed' : ''}`}
         aria-label={t('chat_input_form')}>
         <div className="flex flex-col gap-2">
+          {attachError && (
+            <p className="px-1 text-xs text-signal-bad" role="status">
+              {attachError}
+            </p>
+          )}
+
           {/* File attachments display */}
           {attachedFiles.length > 0 && (
             <div className="flex flex-wrap gap-2 px-0.5">
@@ -272,8 +336,15 @@ export default function ChatInput({
                 <div
                   key={index}
                   className="flex items-center gap-1.5 rounded-pill bg-canvas-raised px-3 py-1 text-xs text-ink-soft shadow-neu-sm">
-                  <FaPaperclip className="size-2.5 shrink-0 text-ink-faint" aria-hidden="true" />
+                  <FaPaperclip
+                    className={`size-2.5 shrink-0 ${file.role === 'upload' ? 'text-accent' : 'text-ink-faint'}`}
+                    aria-hidden="true"
+                  />
                   <span className="max-w-[150px] truncate">{file.name}</span>
+                  {/* Only an upload chip says its size: it is the one the caps apply to. */}
+                  {file.role === 'upload' && (
+                    <span className="shrink-0 text-ink-faint">{Math.max(1, Math.round(file.size / 1024))} KB</span>
+                  )}
                   <button
                     type="button"
                     onClick={() => handleRemoveFile(index)}
@@ -295,7 +366,13 @@ export default function ChatInput({
             aria-disabled={disabled}
             rows={5}
             className="w-full resize-none bg-transparent px-1.5 py-1 text-sm leading-relaxed text-ink placeholder:text-ink-faint focus:outline-none disabled:cursor-not-allowed disabled:text-ink-faint"
-            placeholder={attachedFiles.length > 0 ? 'Add a message (optional)...' : t('chat_input_placeholder')}
+            placeholder={
+              showStopButton
+                ? t('chat_input_placeholder_running')
+                : attachedFiles.length > 0
+                  ? 'Add a message (optional)...'
+                  : t('chat_input_placeholder')
+            }
             aria-label={t('chat_input_editor')}
           />
 
@@ -328,12 +405,12 @@ export default function ChatInput({
                 <FaPaperclip className="size-4" aria-hidden="true" />
               </button>
 
-              {/* Hidden file input */}
+              {/* Hidden file input, deliberately unrestricted: a text extension is read into the
+                  prompt, anything else becomes a file the agent can hand to a page's upload field. */}
               <input
                 ref={fileInputRef}
                 type="file"
                 multiple
-                accept=".txt,.md,.markdown,.json,.csv,.log,.xml,.yaml,.yml"
                 onChange={handleFileChange}
                 className="hidden"
                 aria-hidden="true"
@@ -368,13 +445,28 @@ export default function ChatInput({
             </div>
 
             {showStopButton ? (
-              <button
-                type="button"
-                onClick={onStopTask}
-                className={`flex h-9 shrink-0 items-center gap-2 rounded-pill px-4 text-xs font-medium ${GRAPHITE_KEY} ${GRAPHITE_KEY_IDLE}`}>
-                <span className="size-2 shrink-0 animate-pulse-soft rounded-pill bg-signal-bad" aria-hidden="true" />
-                {t('chat_buttons_stop')}
-              </button>
+              // Both keys, because a run in flight now has two answers: correct it, or end it. Send
+              // sits first so the cheaper, reversible one is what the thumb reaches.
+              <div className="flex shrink-0 items-center gap-2">
+                <button
+                  type="submit"
+                  disabled={isSendButtonDisabled}
+                  aria-disabled={isSendButtonDisabled}
+                  aria-label={t('chat_buttons_steer')}
+                  title={t('chat_buttons_steer')}
+                  className={`grid size-9 shrink-0 place-items-center rounded-pill ${GRAPHITE_KEY} ${
+                    isSendButtonDisabled ? GRAPHITE_KEY_DISABLED : GRAPHITE_KEY_IDLE
+                  }`}>
+                  <FaArrowUp className="size-3.5" aria-hidden="true" />
+                </button>
+                <button
+                  type="button"
+                  onClick={onStopTask}
+                  className={`flex h-9 shrink-0 items-center gap-2 rounded-pill px-4 text-xs font-medium ${GRAPHITE_KEY} ${GRAPHITE_KEY_IDLE}`}>
+                  <span className="size-2 shrink-0 animate-pulse-soft rounded-pill bg-signal-bad" aria-hidden="true" />
+                  {t('chat_buttons_stop')}
+                </button>
+              </div>
             ) : historicalSessionId ? (
               <button
                 type="button"

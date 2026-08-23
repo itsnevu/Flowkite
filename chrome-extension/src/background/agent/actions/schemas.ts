@@ -53,6 +53,33 @@ export const clickElementActionSchema: ActionSchema = {
   }),
 };
 
+export const uploadFileActionSchema: ActionSchema = {
+  name: 'upload_file',
+  description:
+    "Put a file the user attached to this task into the page's upload field. Only files the user attached can be uploaded; you cannot read anything else from their computer. If no file is attached, do not call this - ask the user to attach one instead.",
+  schema: z.object({
+    intent: z.string().default('').describe('purpose of this action'),
+    file_name: z.string().describe('name of the attached file to upload, exactly as it was listed'),
+    index: z
+      .number()
+      .int()
+      .nullable()
+      .optional()
+      .describe("index of the upload control, when the page shows one; omit to use the page's file input"),
+  }),
+};
+
+export const hoverElementActionSchema: ActionSchema = {
+  name: 'hover_element',
+  description:
+    'Move the mouse over an element without clicking it, to reveal what only appears on hover: a dropdown menu, a submenu, a tooltip, a row action button. Read the page again afterwards to see what appeared.',
+  schema: z.object({
+    intent: z.string().default('').describe('purpose of this action'),
+    index: z.number().int().describe('index of the element'),
+    xpath: z.string().nullable().optional().describe('xpath of the element'),
+  }),
+};
+
 export const inputTextActionSchema: ActionSchema = {
   name: 'input_text',
   description: 'Input text into an interactive input element',

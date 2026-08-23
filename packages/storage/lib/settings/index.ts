@@ -5,6 +5,8 @@ export * from './defaultAgentModels';
 export * from './validateProvider';
 export * from './generalSettings';
 export * from './modelPricing';
+export * from './feedbackPrompt';
+export * from './observedModels';
 export * from './schedules';
 export * from './webhook';
 export * from './activityLog';

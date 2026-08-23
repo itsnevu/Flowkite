@@ -213,6 +213,7 @@ const SidePanel = () => {
       replayEnabled,
       isHistoricalSession,
       isFollowUpMode,
+      taskRunning: showStopButton,
       sessionIdRef,
       setMessages,
       setCurrentSessionId,

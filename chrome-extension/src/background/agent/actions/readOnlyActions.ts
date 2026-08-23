@@ -20,6 +20,8 @@ export const READ_ONLY_ACTION_NAMES: ReadonlySet<string> = new Set([
   'extract_content',
   // fills the shared dataset rather than the page; the parent's table is where those rows land
   'extract_structured',
+  // reveals hover-only UI; dispatches pointer events and nothing else, so no state moves
+  'hover_element',
   'scroll_to_percent',
   'scroll_to_top',
   'scroll_to_bottom',

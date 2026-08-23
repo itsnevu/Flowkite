@@ -368,6 +368,10 @@
   "options_pricing_output": {
     "message": "$ / 1M saída"
   },
+  "options_pricing_cached": {
+    "message": "$ / 1M cache",
+    "description": "USD por 1 milhão de tokens de entrada em cache; opcional."
+  },
   "options_pricing_empty": {
     "message": "Atribua modelos na aba Modelos primeiro, as linhas de preço aparecem para os modelos que você usa."
   },
@@ -1217,6 +1221,99 @@
         "example": "Botão de Envio"
       }
     }
+  },
+  "act_hover_start": {
+    "message": "Passar o mouse sobre o elemento com índice $INDEX$",
+    "placeholders": {
+      "index": {
+        "content": "$1",
+        "example": "5"
+      }
+    }
+  },
+  "act_hover_ok": {
+    "message": "Mouse sobre o elemento $INDEX$: $TEXT$",
+    "placeholders": {
+      "index": {
+        "content": "$1",
+        "example": "5"
+      },
+      "text": {
+        "content": "$2",
+        "example": "Account menu"
+      }
+    }
+  },
+  "act_upload_start": {
+    "message": "Enviar o arquivo anexado $NAME$",
+    "placeholders": {
+      "name": {
+        "content": "$1",
+        "example": "cv.pdf"
+      }
+    }
+  },
+  "act_upload_ok": {
+    "message": "$NAME$ enviado para $TARGET$",
+    "placeholders": {
+      "name": {
+        "content": "$1",
+        "example": "cv.pdf"
+      },
+      "target": {
+        "content": "$2",
+        "example": "file input"
+      }
+    }
+  },
+  "act_errors_uploadNoSuchFile": {
+    "message": "Nenhum arquivo anexado chamado $NAME$. O usuário anexou: $AVAILABLE$",
+    "placeholders": {
+      "name": {
+        "content": "$1",
+        "example": "cv.pdf"
+      },
+      "available": {
+        "content": "$2",
+        "example": "resume.pdf, photo.png"
+      }
+    }
+  },
+  "act_errors_uploadNoFiles": {
+    "message": "O usuário não anexou nenhum arquivo a esta tarefa, então não há o que enviar. Peça que ele anexe um com o clipe no campo de mensagem."
+  },
+  "actConfirm_reason_upload": {
+    "message": "Isso envia um arquivo do seu computador para este site."
+  },
+  "chat_attach_tooMuch": {
+    "message": "Isso é mais do que o Flowkite pode guardar para uma tarefa. Remova um arquivo ou anexe um menor."
+  },
+  "chat_attach_rejected": {
+    "message": "Não foi possível anexar $NAMES$ - grande demais ou ilegível.",
+    "placeholders": {
+      "names": {
+        "content": "$1",
+        "example": "photo.png"
+      }
+    }
+  },
+  "exec_steer_applied": {
+    "message": "Correção aplicada: $TEXT$",
+    "placeholders": {
+      "text": {
+        "content": "$1",
+        "example": "pilih yang termurah"
+      }
+    }
+  },
+  "bg_cmd_steer_notRunning": {
+    "message": "Só é possível orientar enquanto uma tarefa está em execução."
+  },
+  "chat_buttons_steer": {
+    "message": "Enviar correção"
+  },
+  "chat_input_placeholder_running": {
+    "message": "Corrija o agente enquanto ele trabalha..."
   },
   "act_click_newTabOpened": {
     "message": "Nova aba aberta - mudando para ela"
@@ -2069,5 +2166,86 @@
   },
   "options_models_providers_placeholders_models": {
     "message": "Digite um modelo e pressione Enter"
+  },
+  "bg_overlay_active": {
+    "message": "Flowkite está ativo",
+    "description": "Selo mostrado na página que o agente está controlando."
+  },
+  "bg_overlay_stop": {
+    "message": "Parar o Flowkite",
+    "description": "Botão na página que cancela a tarefa em execução."
+  },
+  "chat_feedback_question": {
+    "message": "Como o Flowkite está indo nesta sessão?"
+  },
+  "chat_feedback_bad": {
+    "message": "Ruim"
+  },
+  "chat_feedback_fine": {
+    "message": "Ok"
+  },
+  "chat_feedback_good": {
+    "message": "Bom"
+  },
+  "chat_feedback_dismiss": {
+    "message": "Dispensar a pergunta de feedback"
+  },
+  "chat_feedback_thanks": {
+    "message": "Obrigado, isso ajuda."
+  },
+  "options_analytics_collect_feedback": {
+    "message": "Avaliações da sessão que você dá no painel (ruim / ok / bom)"
+  },
+  "options_pricing_cacheWrite": {
+    "message": "$ / 1M escrita cache"
+  },
+  "options_pricing_seen": {
+    "message": "visto no uso"
+  },
+  "options_pricing_seenHint": {
+    "message": "Seu provedor informou gasto de tokens com exatamente este nome. Defina o preço aqui ou os tokens dele nunca entram no total em dólar."
+  },
+  "chat_usage_credit": {
+    "message": "$AMOUNT$ de crédito por $TOKENS$ tokens",
+    "placeholders": {
+      "amount": {
+        "content": "$1",
+        "example": "≈ $0.42"
+      },
+      "tokens": {
+        "content": "$2",
+        "example": "163,148"
+      }
+    }
+  },
+  "chat_usage_creditUnknown": {
+    "message": "$TOKENS$ tokens · custo desconhecido, nenhum preço informado",
+    "placeholders": {
+      "tokens": {
+        "content": "$1",
+        "example": "163,148"
+      }
+    }
+  },
+  "chat_usage_rowNoPrice": {
+    "message": "sem preço"
+  },
+  "chat_usage_cacheWrite": {
+    "message": "$COUNT$ de escrita em cache",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "12,400"
+      }
+    }
+  },
+  "options_general_activityOverlay": {
+    "message": "Mostrar o Flowkite na página"
+  },
+  "options_general_activityOverlay_desc": {
+    "message": "Desenha uma borda branca, um selo com a ação em andamento, o cursor que o Flowkite move e um botão de parar em cada página que ele controla. Ativado por padrão: uma aba digitando sozinha nunca deve ser um mistério."
+  },
+  "chat_feedback_report": {
+    "message": "Conte o que deu errado"
   }
 }

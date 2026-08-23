@@ -1,4 +1,5 @@
 import 'webextension-polyfill';
+import { t } from '@extension/i18n';
 import { createLogger } from '@src/background/log';
 import { activityLogStore } from '@extension/storage';
 import { analytics } from '../services/analytics';
@@ -35,6 +36,16 @@ export default class BrowserContext {
   private _attachedPages: Map<number, Page> = new Map();
   /** Null outside a task, and whenever the user has turned tab grouping off. */
   private _tabGroup: TaskTabGroup | null = null;
+  /**
+   * Whether the agent is announcing itself on the tabs it drives, and what it is doing right now.
+   *
+   * Kept on the context rather than on a Page because the announcement belongs to the task, not to
+   * a tab: the agent moves between tabs mid-task, and every tab it lands on has to carry the banner
+   * from the moment it arrives.
+   */
+  private _activityDetail: string | null = null;
+  /** Called when the user presses the stop button drawn on the page. */
+  private _activityStopHandler: (() => void) | null = null;
 
   constructor(config: Partial<BrowserContextConfig>) {
     this._config = { ...DEFAULT_BROWSER_CONTEXT_CONFIG, ...config };
@@ -103,6 +114,8 @@ export default class BrowserContext {
       logger.warning('Failed to remove highlights during cleanup:', error);
     }
 
+    await this.hideActivity();
+
     // detach all pages; one page failing to detach must not strand the rest
     for (const page of this._attachedPages.values()) {
       try {
@@ -113,6 +126,50 @@ export default class BrowserContext {
     }
     this._attachedPages.clear();
     this._currentTabId = null;
+  }
+
+  /**
+   * Route the on-page stop button to whoever can actually stop the task.
+   *
+   * Set once per Executor and pushed to every page, including ones attached later: a button that
+   * silently does nothing on the second tab of a task is worse than no button at all.
+   */
+  public setActivityStopHandler(handler: (() => void) | null): void {
+    this._activityStopHandler = handler;
+    for (const page of this._attachedPages.values()) {
+      page.setActivityStopHandler(handler);
+    }
+  }
+
+  /**
+   * Announce the agent on the tab it is driving, and say what it is doing.
+   *
+   * Deliberately not `getCurrentPage()`: that helper attaches to - or creates - a tab when there is
+   * no current one, and drawing a banner is never a reason to raise the debugging banner on a tab
+   * this task has not touched. With no attached current page there is simply nothing to draw on
+   * yet, and the next action that does attach one draws it then.
+   */
+  public async showActivity(detail: string): Promise<void> {
+    if (!this._config.showActivityOverlay) return;
+    this._activityDetail = detail;
+    const page = this._currentTabId !== null ? this._attachedPages.get(this._currentTabId) : undefined;
+    await page?.showActivityOverlay({
+      title: t('bg_overlay_active'),
+      detail,
+      stopLabel: t('bg_overlay_stop'),
+    });
+  }
+
+  /** Take the banner off every tab this task touched. Never throws: it runs on the teardown path. */
+  public async hideActivity(): Promise<void> {
+    this._activityDetail = null;
+    for (const page of this._attachedPages.values()) {
+      try {
+        await page.hideActivityOverlay();
+      } catch (error) {
+        logger.debug('Failed to remove the activity overlay:', error);
+      }
+    }
   }
 
   public async attachPage(page: Page): Promise<boolean> {
@@ -126,6 +183,18 @@ export default class BrowserContext {
       logger.info('attachPage', page.tabId, 'attached');
       // add page to managed pages
       this._attachedPages.set(page.tabId, page);
+      page.setActivityStopHandler(this._activityStopHandler);
+      // A tab the task switches to mid-run has to carry the banner too, so it is drawn on arrival
+      // rather than waiting for the next action to redraw it.
+      if (this._activityDetail !== null) {
+        void page
+          .showActivityOverlay({
+            title: t('bg_overlay_active'),
+            detail: this._activityDetail,
+            stopLabel: t('bg_overlay_stop'),
+          })
+          .catch(() => undefined);
+      }
       // Disclose the tab as agent-driven. Awaited so the chip is in place before the agent acts on
       // the page, but it can never fail the attach - TaskTabGroup swallows its own errors.
       await this._tabGroup?.adopt(page.tabId);

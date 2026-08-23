@@ -10,6 +10,7 @@ export enum SensitiveActionKind {
   DESTRUCTIVE = 'destructive',
   DOWNLOAD = 'download',
   CREDENTIALS = 'credentials',
+  UPLOAD = 'upload',
   PUBLISH = 'publish',
 }
 
@@ -180,6 +181,12 @@ export function classifySensitiveAction(
       return { kind: SensitiveActionKind.DOWNLOAD, target: String(args.url) };
     }
     return null;
+  }
+
+  // Always asked about, never keyword-matched: the file leaves the user's machine for a site the
+  // moment this runs, and no label on the page tells you whether that is what they wanted.
+  if (actionName === 'upload_file') {
+    return { kind: SensitiveActionKind.UPLOAD, target: String(args.file_name ?? 'file') };
   }
 
   if (actionName === 'input_text' && element) {

@@ -368,6 +368,10 @@
   "options_pricing_output": {
     "message": "$ / 1M out"
   },
+  "options_pricing_cached": {
+    "message": "$ / 1M cached",
+    "description": "USD per one million cached input tokens; optional."
+  },
   "options_pricing_empty": {
     "message": "Assign models in the Models tab first, pricing rows appear for the models you use."
   },
@@ -1217,6 +1221,99 @@
         "example": "Submit Button"
       }
     }
+  },
+  "act_hover_start": {
+    "message": "Hover over element with index $INDEX$",
+    "placeholders": {
+      "index": {
+        "content": "$1",
+        "example": "5"
+      }
+    }
+  },
+  "act_hover_ok": {
+    "message": "Hovered over element $INDEX$: $TEXT$",
+    "placeholders": {
+      "index": {
+        "content": "$1",
+        "example": "5"
+      },
+      "text": {
+        "content": "$2",
+        "example": "Account menu"
+      }
+    }
+  },
+  "act_upload_start": {
+    "message": "Upload the attached file $NAME$",
+    "placeholders": {
+      "name": {
+        "content": "$1",
+        "example": "cv.pdf"
+      }
+    }
+  },
+  "act_upload_ok": {
+    "message": "Uploaded $NAME$ to $TARGET$",
+    "placeholders": {
+      "name": {
+        "content": "$1",
+        "example": "cv.pdf"
+      },
+      "target": {
+        "content": "$2",
+        "example": "file input"
+      }
+    }
+  },
+  "act_errors_uploadNoSuchFile": {
+    "message": "No attached file called $NAME$. The user attached: $AVAILABLE$",
+    "placeholders": {
+      "name": {
+        "content": "$1",
+        "example": "cv.pdf"
+      },
+      "available": {
+        "content": "$2",
+        "example": "resume.pdf, photo.png"
+      }
+    }
+  },
+  "act_errors_uploadNoFiles": {
+    "message": "The user has not attached any file to this task, so there is nothing to upload. Ask them to attach one with the paperclip in the composer."
+  },
+  "actConfirm_reason_upload": {
+    "message": "This sends a file from your computer to this site."
+  },
+  "chat_attach_tooMuch": {
+    "message": "That is more than Flowkite can hold for one task. Remove a file or attach a smaller one."
+  },
+  "chat_attach_rejected": {
+    "message": "Could not attach $NAMES$ - too large, or unreadable.",
+    "placeholders": {
+      "names": {
+        "content": "$1",
+        "example": "photo.png"
+      }
+    }
+  },
+  "exec_steer_applied": {
+    "message": "Applied your correction: $TEXT$",
+    "placeholders": {
+      "text": {
+        "content": "$1",
+        "example": "pilih yang termurah"
+      }
+    }
+  },
+  "bg_cmd_steer_notRunning": {
+    "message": "Steering is only possible while a task is running."
+  },
+  "chat_buttons_steer": {
+    "message": "Send correction"
+  },
+  "chat_input_placeholder_running": {
+    "message": "Correct the agent while it works..."
   },
   "act_click_newTabOpened": {
     "message": "New tab opened - switching to it"
@@ -2069,5 +2166,86 @@
   },
   "options_models_providers_placeholders_models": {
     "message": "Add a model name, then press Enter"
+  },
+  "bg_overlay_active": {
+    "message": "Flowkite is active",
+    "description": "Badge shown on a page the agent is driving."
+  },
+  "bg_overlay_stop": {
+    "message": "Stop Flowkite",
+    "description": "Button drawn on the page that cancels the running task."
+  },
+  "chat_feedback_question": {
+    "message": "How is Flowkite doing this session?"
+  },
+  "chat_feedback_bad": {
+    "message": "Bad"
+  },
+  "chat_feedback_fine": {
+    "message": "Fine"
+  },
+  "chat_feedback_good": {
+    "message": "Good"
+  },
+  "chat_feedback_dismiss": {
+    "message": "Dismiss the feedback question"
+  },
+  "chat_feedback_thanks": {
+    "message": "Thanks, that helps."
+  },
+  "options_analytics_collect_feedback": {
+    "message": "Session ratings you give in the panel (bad / fine / good)"
+  },
+  "options_pricing_cacheWrite": {
+    "message": "$ / 1M cache write"
+  },
+  "options_pricing_seen": {
+    "message": "seen in usage"
+  },
+  "options_pricing_seenHint": {
+    "message": "Your provider reported spending tokens under this exact name. Price it here or its tokens never reach the dollar total."
+  },
+  "chat_usage_credit": {
+    "message": "$AMOUNT$ of credit for $TOKENS$ tokens",
+    "placeholders": {
+      "amount": {
+        "content": "$1",
+        "example": "≈ $0.42"
+      },
+      "tokens": {
+        "content": "$2",
+        "example": "163,148"
+      }
+    }
+  },
+  "chat_usage_creditUnknown": {
+    "message": "$TOKENS$ tokens · cost unknown, no price entered",
+    "placeholders": {
+      "tokens": {
+        "content": "$1",
+        "example": "163,148"
+      }
+    }
+  },
+  "chat_usage_rowNoPrice": {
+    "message": "no price"
+  },
+  "chat_usage_cacheWrite": {
+    "message": "$COUNT$ cache write",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "12,400"
+      }
+    }
+  },
+  "options_general_activityOverlay": {
+    "message": "Show Flowkite on the page"
+  },
+  "options_general_activityOverlay_desc": {
+    "message": "Draws a white border, a badge naming the action in progress, the cursor Flowkite moves, and a stop button on every page it drives. On by default: a tab typing on its own should never be a mystery."
+  },
+  "chat_feedback_report": {
+    "message": "Tell us what went wrong"
   }
 }

@@ -13,15 +13,13 @@ describe('contextWindowFor', () => {
     expect(contextWindowFor(ProviderTypeEnum.Ollama)).toBe(OLLAMA_CONTEXT_TOKENS);
   });
 
-  it.each([
-    ProviderTypeEnum.OpenAI,
-    ProviderTypeEnum.Anthropic,
-    ProviderTypeEnum.Gemini,
-    ProviderTypeEnum.OpenRouter,
-  ])('states no window for %s, whose window belongs to the model', provider => {
-    // Deliberately not a per-model table: a stale one would refuse budgets that are in fact fine.
-    expect(contextWindowFor(provider)).toBeUndefined();
-  });
+  it.each([ProviderTypeEnum.OpenAI, ProviderTypeEnum.Anthropic, ProviderTypeEnum.Gemini, ProviderTypeEnum.OpenRouter])(
+    'states no window for %s, whose window belongs to the model',
+    provider => {
+      // Deliberately not a per-model table: a stale one would refuse budgets that are in fact fine.
+      expect(contextWindowFor(provider)).toBeUndefined();
+    },
+  );
 
   it('states no window for a custom provider id', () => {
     expect(contextWindowFor('custom_openai_1')).toBeUndefined();

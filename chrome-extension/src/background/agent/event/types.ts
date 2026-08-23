@@ -162,6 +162,13 @@ export interface TokenUsageTotals {
   /** the provider's own total, which for thinking models can exceed input + output */
   totalTokens: number;
   cachedInputTokens: number;
+  /**
+   * Input tokens written into the prompt cache, billed at a premium by some providers.
+   *
+   * Optional because sessions stored before it existed do not carry it, and a stored snapshot is
+   * read back through this same shape - a required field would make every old session unreadable.
+   */
+  cacheCreationInputTokens?: number;
   reasoningOutputTokens: number;
 }
 

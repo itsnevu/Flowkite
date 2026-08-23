@@ -18,6 +18,8 @@ const reasonFor = (kind: string): string => {
       return t('actConfirm_reason_destructive');
     case 'download':
       return t('actConfirm_reason_download');
+    case 'upload':
+      return t('actConfirm_reason_upload');
     case 'credentials':
       return t('actConfirm_reason_credentials');
     case 'publish':

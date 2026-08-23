@@ -9,6 +9,7 @@ import AutoModeNotice from './AutoModeNotice';
 import BudgetPauseCard from './BudgetPauseCard';
 import HandoffCard from './HandoffCard';
 import TokenUsageBar from './TokenUsageBar';
+import SessionFeedbackBar from './SessionFeedbackBar';
 import LiveStatusStrip from './LiveStatusStrip';
 import type { RefObject } from 'react';
 import type { ApprovalMode, Message, ModelPricingConfig, TrailStep } from '@extension/storage';
@@ -130,7 +131,9 @@ const ChatView = ({
             onMicClick={onMicClick}
             isRecording={isRecording}
             isProcessingSpeech={isProcessingSpeech}
-            disabled={!inputEnabled || isHistoricalSession}
+            // A run in flight keeps the composer live: what is typed there becomes a correction
+            // rather than a task, which is the point of steering.
+            disabled={(!inputEnabled && !showStopButton) || isHistoricalSession}
             showStopButton={showStopButton}
             setContent={onSetInputText}
             historicalSessionId={isHistoricalSession && replayEnabled ? currentSessionId : null}
@@ -205,6 +208,11 @@ const ChatView = ({
     {tokenUsage && messages.length > 0 && !pendingPlan && !pendingAction && (
       <TokenUsageBar usage={tokenUsage} prices={modelPrices} />
     )}
+    {/* Below the spend, above the composer: the last thing read before typing, and never during a
+        run or while a card is waiting on an answer. */}
+    {messages.length > 0 && !pendingPlan && !pendingAction && !pendingBudget && !pendingHandoff && (
+      <SessionFeedbackBar busy={showStopButton} />
+    )}
     {messages.length > 0 && (
       <div className="shrink-0 px-3 pb-3 pt-2">
         <ChatInput
@@ -213,7 +221,9 @@ const ChatView = ({
           onMicClick={onMicClick}
           isRecording={isRecording}
           isProcessingSpeech={isProcessingSpeech}
-          disabled={!inputEnabled || isHistoricalSession}
+          // A run in flight keeps the composer live: what is typed there becomes a correction
+          // rather than a task, which is the point of steering.
+          disabled={(!inputEnabled && !showStopButton) || isHistoricalSession}
           showStopButton={showStopButton}
           setContent={onSetInputText}
           historicalSessionId={isHistoricalSession && replayEnabled ? currentSessionId : null}

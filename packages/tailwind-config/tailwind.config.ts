@@ -45,6 +45,16 @@ export default {
           // carries real content (timestamps, field hints), so it has to clear AA.
           faint: '#5f6673',
         },
+        // The one hue that is not graphite or a status: what carries emphasis inside agent prose -
+        // the key term in a sentence, a literal value, a section label. Violet rather than the
+        // orange every other assistant uses, so a Flowkite answer is recognisably Flowkite's.
+        // 5.54:1 on canvas and 5.84:1 on canvas-raised, so emphasis never costs legibility.
+        accent: {
+          DEFAULT: '#6b4bb8',
+          strong: '#553a94',
+          // chip ground for inline literals; the violet above clears 4.7:1 on it
+          soft: '#ece7f7',
+        },
         // Restrained status hues, desaturated to sit calmly on the pale ground.
         signal: {
           ok: '#2f8f5b',

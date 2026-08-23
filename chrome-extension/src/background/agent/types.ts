@@ -176,6 +176,14 @@ export class AgentContext {
   }
 
   async emitEvent(actor: Actors, state: ExecutionState, eventDetails: string, payload?: EventPayload) {
+    // The same sentence the side panel is about to show goes onto the page the agent is driving, so
+    // a user watching the tab rather than the panel sees what it is doing. Only the navigator's
+    // "about to act" line: it is the one event that describes something happening to the page in
+    // front of them, and it is already localised. Not awaited - the banner is for the user, and a
+    // slow or unreachable tab must not hold up the action it is describing.
+    if (actor === Actors.NAVIGATOR && state === ExecutionState.ACT_START) {
+      void this.browserContext.showActivity(eventDetails).catch(() => undefined);
+    }
     const event = new AgentEvent(actor, state, {
       taskId: this.taskId,
       step: this.nSteps,

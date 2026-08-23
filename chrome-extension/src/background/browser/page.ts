@@ -15,6 +15,18 @@ import {
   scrollPage as _scrollPage,
 } from './dom/service';
 import { DOMElementNode, type DOMState } from './dom/views';
+import {
+  ACTIVITY_STOP_BINDING,
+  flashActivityCapture,
+  moveActivityCursor,
+  pulseActivityTarget,
+  removeActivityOverlay,
+  renderActivityOverlay,
+  setActivityOverlayHidden,
+  takeActivityStopRequest,
+  type ActivityOverlayContent,
+  type ActivityTargetRect,
+} from './activityOverlay';
 import { type BrowserContextConfig, DEFAULT_BROWSER_CONTEXT_CONFIG, type PageState, URLNotAllowedError } from './views';
 import { ClickableElementProcessor } from './dom/clickable/service';
 import { isUrlAllowed } from './util';
@@ -32,6 +44,9 @@ const logger = createLogger('Page');
  * treated as "the click failed" - see `clickElementNode`.
  */
 const CLICK_DEADLINE_MS = 2000;
+
+/** How often the overlay's stop button is polled, on the pages where its binding did not install. */
+const ACTIVITY_STOP_POLL_MS = 500;
 
 /**
  * The absolute ceiling on waiting for a click to settle.
@@ -291,6 +306,9 @@ export default class Page {
   }
 
   async detachPuppeteer(): Promise<void> {
+    // Before anything else: an interval left running holds a reference to a page that is going away,
+    // and would keep evaluating against a detached target every half second.
+    this._stopActivityStopPolling();
     if (this._browser) {
       await this._browser.disconnect();
       this._browser = null;
@@ -298,6 +316,157 @@ export default class Page {
       // reset the state
       this._state = build_initial_state(this._tabId);
     }
+  }
+
+  /**
+   * What the on-page banner says while this page is being driven, or null when the agent is not
+   * announcing itself on it. Held so a navigation, which wipes the overlay along with the document,
+   * can be answered by redrawing the same content rather than by losing it.
+   */
+  private _activityContent: ActivityOverlayContent | null = null;
+  /** Called when the user presses the overlay's stop button. Set by the BrowserContext. */
+  private _activityStopHandler: (() => void) | null = null;
+  /** Whether `ACTIVITY_STOP_BINDING` has been bound on this page. Binding twice throws. */
+  private _activityStopBound = false;
+  /** Set only when the binding did not take, and the stop button has to be polled for instead. */
+  private _activityStopPoll: ReturnType<typeof setInterval> | null = null;
+
+  setActivityStopHandler(handler: (() => void) | null): void {
+    this._activityStopHandler = handler;
+  }
+
+  /**
+   * Draw, or redraw, the "Flowkite is active" banner, ring and stop button on this page.
+   *
+   * Called on every action rather than once per task on purpose: the overlay lives in the document,
+   * so every navigation destroys it, and re-asserting it is both how it survives and how the detail
+   * line stays current. Failures are swallowed - a page that will not take the banner (a PDF
+   * viewer, a document mid-navigation) is still a page the agent must be allowed to work on.
+   */
+  async showActivityOverlay(content: ActivityOverlayContent): Promise<void> {
+    if (!this._validWebPage || !this._puppeteerPage) return;
+    this._activityContent = content;
+    try {
+      await this._bindActivityStop();
+      await this._puppeteerPage.evaluate(renderActivityOverlay, content);
+    } catch (error) {
+      logger.debug('Could not draw the activity overlay:', error);
+    }
+  }
+
+  /** Move the drawn cursor onto an element and ring it, just before the agent acts on it. */
+  async markActivityTarget(element: ElementHandle): Promise<void> {
+    if (!this._activityContent || !this._puppeteerPage) return;
+    try {
+      const box = await element.boundingBox();
+      if (!box) return;
+      const rect: ActivityTargetRect = { x: box.x, y: box.y, width: box.width, height: box.height };
+      await this._puppeteerPage.evaluate(moveActivityCursor, rect);
+      await this._puppeteerPage.evaluate(pulseActivityTarget, rect);
+    } catch (error) {
+      logger.debug('Could not mark the activity target:', error);
+    }
+  }
+
+  /** Take the banner off this page and forget it, so a later navigation does not bring it back. */
+  async hideActivityOverlay(): Promise<void> {
+    this._activityContent = null;
+    this._stopActivityStopPolling();
+    if (!this._puppeteerPage) return;
+    try {
+      await this._puppeteerPage.evaluate(removeActivityOverlay);
+    } catch (error) {
+      logger.debug('Could not remove the activity overlay:', error);
+    }
+  }
+
+  /**
+   * Run something with the overlay switched off.
+   *
+   * Every read of the page the model will see goes through here. The banner is drawn for the user
+   * and only for the user: in a screenshot it is a caption the model tries to read, and in the
+   * extracted text it is a line of prose that was never on the page.
+   */
+  private async _withActivityOverlayHidden<T>(read: () => Promise<T>): Promise<T> {
+    if (!this._activityContent || !this._puppeteerPage) return read();
+    try {
+      await this._puppeteerPage.evaluate(setActivityOverlayHidden, true);
+    } catch {
+      // Nothing to hide, or the page went away; the read is what matters.
+    }
+    try {
+      return await read();
+    } finally {
+      try {
+        await this._puppeteerPage.evaluate(setActivityOverlayHidden, false);
+      } catch {
+        // The overlay is redrawn on the next action anyway.
+      }
+    }
+  }
+
+  /**
+   * Give the overlay's stop button a way to reach the executor.
+   *
+   * `exposeFunction` installs the binding for the page's whole lifetime, navigations included, so
+   * this runs once. It throws if the name is already taken, which is the one failure worth
+   * recording as already-done rather than retrying forever.
+   */
+  private async _bindActivityStop(): Promise<void> {
+    if (this._activityStopBound || !this._puppeteerPage) return;
+    this._activityStopBound = true;
+    try {
+      await this._puppeteerPage.exposeFunction(ACTIVITY_STOP_BINDING, () => {
+        logger.info('Stop requested from the on-page overlay');
+        this._activityStopHandler?.();
+      });
+      // Asked, not assumed. exposeFunction resolving is not proof the binding is reachable from the
+      // page - the transport here is chrome.debugger rather than a normal Puppeteer connection - and
+      // the failure mode is a stop button that does nothing, which is the one outcome not worth
+      // risking. The page itself is the only witness that can answer.
+      const bound = await this._puppeteerPage.evaluate(
+        name => typeof (window as unknown as Record<string, unknown>)[name] === 'function',
+        ACTIVITY_STOP_BINDING,
+      );
+      if (!bound) {
+        logger.warning('Overlay stop binding did not install; falling back to polling the button');
+        this._startActivityStopPolling();
+      }
+    } catch (error) {
+      logger.debug('Could not bind the overlay stop button:', error);
+      this._startActivityStopPolling();
+    }
+  }
+
+  /**
+   * Watch the page for a stop the binding could not deliver.
+   *
+   * Only ever started when the binding is known not to have installed, so the common case pays
+   * nothing. The interval is a compromise: fast enough that the button feels like a button, slow
+   * enough that it is not a CDP round-trip per frame.
+   */
+  private _startActivityStopPolling(): void {
+    if (this._activityStopPoll) return;
+    this._activityStopPoll = setInterval(() => {
+      if (!this._activityContent || !this._puppeteerPage) return;
+      this._puppeteerPage
+        .evaluate(takeActivityStopRequest)
+        .then(requested => {
+          if (requested) {
+            logger.info('Stop requested from the on-page overlay (polled)');
+            this._activityStopHandler?.();
+          }
+        })
+        .catch(() => {
+          // A navigation in flight, or a page that has gone away. The next tick asks again.
+        });
+    }, ACTIVITY_STOP_POLL_MS);
+  }
+
+  private _stopActivityStopPolling(): void {
+    if (!this._activityStopPoll) return;
+    clearInterval(this._activityStopPoll);
+    this._activityStopPoll = null;
   }
 
   /**
@@ -539,7 +708,13 @@ export default class Page {
     if (!this._puppeteerPage) {
       throw new Error('Puppeteer page is not connected');
     }
-    return await this._puppeteerPage.evaluate(() => document.body?.innerText ?? '');
+    return this._withActivityOverlayHidden(async () => {
+      // innerText is layout-based, so the banner's own words would land in the extracted text if it
+      // were merely behind a shadow root rather than switched off.
+      const page = this._puppeteerPage;
+      if (!page) throw new Error('Puppeteer page is not connected');
+      return page.evaluate(() => document.body?.innerText ?? '');
+    });
   }
 
   getCachedState(): PageState | null {
@@ -702,6 +877,20 @@ export default class Page {
   }
 
   async takeScreenshot(fullPage = false): Promise<string | null> {
+    if (!this._puppeteerPage) {
+      throw new Error('Puppeteer page is not connected');
+    }
+    const screenshot = await this._withActivityOverlayHidden(() => this._captureScreenshot(fullPage));
+    // Flashed after the capture and after the overlay is back, never before: a flash that made it
+    // into the frame would be a white page handed to the model. Not awaited - the animation is for
+    // the user, and the agent has no reason to wait out 400ms of it.
+    if (this._activityContent) {
+      this._puppeteerPage?.evaluate(flashActivityCapture).catch(() => undefined);
+    }
+    return screenshot;
+  }
+
+  private async _captureScreenshot(fullPage: boolean): Promise<string | null> {
     if (!this._puppeteerPage) {
       throw new Error('Puppeteer page is not connected');
     }
@@ -1384,6 +1573,8 @@ export default class Page {
         logger.debug(`Non-critical error preparing element: ${e}`);
       }
 
+      await this.markActivityTarget(element);
+
       // Get element properties to determine input method
       const tagName = await element.evaluate(el => el.tagName.toLowerCase());
       const isContentEditable = await element.evaluate(el => {
@@ -1537,6 +1728,162 @@ export default class Page {
     }
   }
 
+  /**
+   * Put a file the user attached into a page's file input.
+   *
+   * Not Puppeteer's `uploadFile`, and not CDP's `DOM.setFileInputFiles`: both take a path on disk,
+   * and an extension never has one. A file input hands JavaScript a File object, never its
+   * location, so the only route left is to build the File from bytes we already hold and assign it.
+   *
+   * Runs in the MAIN world on purpose. `input.files` only accepts a FileList, which cannot be
+   * constructed directly - it has to come out of a DataTransfer - and a DataTransfer built in the
+   * isolated world belongs to a different realm than the input it is being assigned to. Building
+   * both in the page's own realm sidesteps that entirely, and has the second benefit that the
+   * File the site's own upload code reads is an ordinary same-realm File.
+   *
+   * The change and input events are dispatched by hand afterwards. Assigning `.files` fires
+   * nothing, so without them every framework on the page still believes the field is empty - which
+   * is the failure mode where the file is visibly attached and the Submit button stays disabled.
+   *
+   * @param elementNode the element the model chose, or null to take the page's first file input
+   * @param file name, type and base64 bytes of the attachment
+   * @returns a short description of the input that received it, for the action's result message
+   */
+  async uploadFileToElement(
+    elementNode: DOMElementNode | null,
+    file: { name: string; mimeType: string; data: string },
+  ): Promise<string> {
+    // Only ever a hint: an input inside a shadow root or a cross-origin frame will not match it,
+    // and the injected side falls back to searching rather than failing.
+    const selector = elementNode
+      ? elementNode.enhancedCssSelectorForElement(this._config.includeDynamicAttributes)
+      : '';
+
+    const [injection] = await chrome.scripting.executeScript({
+      target: { tabId: this._tabId },
+      world: 'MAIN',
+      args: [selector, file.name, file.mimeType, file.data],
+      func: (cssSelector: string, fileName: string, mimeType: string, base64: string) => {
+        /** The file input to fill: the chosen element, one inside it, or the page's first one. */
+        const resolveInput = (): HTMLInputElement | null => {
+          const isFileInput = (node: Element | null | undefined): node is HTMLInputElement =>
+            node instanceof HTMLInputElement && node.type === 'file';
+
+          if (cssSelector) {
+            let chosen: Element | null = null;
+            try {
+              chosen = document.querySelector(cssSelector);
+            } catch {
+              // a selector built from page attributes can be syntactically invalid; fall through
+            }
+            if (isFileInput(chosen)) return chosen;
+            // The visible "Choose file" control is very often a label or button that hides the real
+            // input somewhere nearby, so look inside it and then at its siblings before giving up.
+            const nested = chosen?.querySelector('input[type="file"]');
+            if (isFileInput(nested)) return nested;
+            const inLabel = chosen?.closest('label')?.querySelector('input[type="file"]');
+            if (isFileInput(inLabel)) return inLabel;
+          }
+
+          // Last resort: the first file input on the page. Deliberately not filtered by visibility -
+          // a hidden input driven by a styled button is the common case, not the exception.
+          const first = document.querySelector('input[type="file"]');
+          return isFileInput(first) ? first : null;
+        };
+
+        const input = resolveInput();
+        if (!input) return { ok: false as const, reason: 'no-input' };
+
+        const binary = atob(base64);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+
+        const transfer = new DataTransfer();
+        transfer.items.add(new File([bytes], fileName, { type: mimeType || 'application/octet-stream' }));
+        try {
+          input.files = transfer.files;
+        } catch {
+          return { ok: false as const, reason: 'assign-failed' };
+        }
+
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+
+        const label =
+          input.getAttribute('aria-label') ?? input.getAttribute('name') ?? input.getAttribute('id') ?? 'file input';
+        return { ok: true as const, label };
+      },
+    });
+
+    const result = injection?.result;
+    if (!result || !result.ok) {
+      throw new Error(
+        result?.reason === 'assign-failed'
+          ? 'The page refused the file, which usually means the field only accepts a different file type'
+          : 'No file input could be found on this page',
+      );
+    }
+    return result.label;
+  }
+
+  /**
+   * Park the mouse over an element so whatever only exists on hover appears: a nav submenu, a row's
+   * action buttons, a tooltip carrying the real price.
+   *
+   * Nothing here mirrors clickElementNode's deadline dance, because the hazard that motivated it
+   * does not exist: a hover that lands twice is the same hover, so a plain retry is safe. The
+   * fallback dispatches the pointer/mouse sequence a real cursor produces, in the order a listener
+   * expects, since libraries listen for different members of it (pointerover, mouseover, mouseenter)
+   * and one alone leaves half of them unfired.
+   *
+   * Deliberately no wait afterwards. What hover reveals is animated at wildly different speeds, so
+   * any fixed sleep is either dead time or too short; the agent reads the page on its next step,
+   * which is when the reveal has to be there anyway.
+   */
+  async hoverElementNode(elementNode: DOMElementNode): Promise<void> {
+    if (!this._puppeteerPage) {
+      throw new Error('Puppeteer is not connected');
+    }
+
+    try {
+      const element = await this.locateElement(elementNode);
+      if (!element) {
+        throw new Error(`Element: ${elementNode} not found`);
+      }
+
+      await this._scrollIntoViewIfNeeded(element);
+      await this.markActivityTarget(element);
+
+      try {
+        await element.hover();
+      } catch (error) {
+        // Puppeteer's hover needs a hit-testable point, which an element covered by a sticky header
+        // or sized zero does not have. Synthesising the events reaches the listeners anyway.
+        logger.info('Native hover failed, dispatching pointer events directly', error);
+        await element.evaluate(el => {
+          const target = el as HTMLElement;
+          const box = target.getBoundingClientRect();
+          const init: MouseEventInit = {
+            bubbles: true,
+            cancelable: true,
+            clientX: box.left + box.width / 2,
+            clientY: box.top + box.height / 2,
+            view: window,
+          };
+          target.dispatchEvent(new PointerEvent('pointerover', init));
+          target.dispatchEvent(new PointerEvent('pointerenter', { ...init, bubbles: false }));
+          target.dispatchEvent(new MouseEvent('mouseover', init));
+          target.dispatchEvent(new MouseEvent('mouseenter', { ...init, bubbles: false }));
+          target.dispatchEvent(new MouseEvent('mousemove', init));
+        });
+      }
+    } catch (error) {
+      throw new Error(
+        `Failed to hover element: ${elementNode}. Error: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
   async clickElementNode(useVision: boolean, elementNode: DOMElementNode): Promise<void> {
     if (!this._puppeteerPage) {
       throw new Error('Puppeteer is not connected');
@@ -1555,6 +1902,10 @@ export default class Page {
 
       // Scroll element into view if needed
       await this._scrollIntoViewIfNeeded(element);
+
+      // Show the user where the click is about to land, after the scroll so the coordinates are the
+      // ones the click will actually use.
+      await this.markActivityTarget(element);
 
       // A deadline decides how long to wait for the click, never whether to click again.
       //

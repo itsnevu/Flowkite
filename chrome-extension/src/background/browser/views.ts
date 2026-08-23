@@ -86,6 +86,8 @@ export interface BrowserContextConfig {
    * @default 'off'
    */
   agentOverlay: AgentOverlayMode;
+  /** Whether to announce the agent on the pages it drives. See `showActivityOverlay` in settings. */
+  showActivityOverlay: boolean;
 
   /**
    * Collect every tab the agent drives into one labelled Chrome tab group, so the user can tell
@@ -107,6 +109,7 @@ export const DEFAULT_BROWSER_CONTEXT_CONFIG: BrowserContextConfig = {
   includeDynamicAttributes: true,
   homePageUrl: 'about:blank',
   agentOverlay: 'off',
+  showActivityOverlay: true,
   groupTabs: true,
 };
 

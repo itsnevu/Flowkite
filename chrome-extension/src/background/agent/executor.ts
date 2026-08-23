@@ -1,7 +1,7 @@
 import { t } from '@extension/i18n';
 import { createLogger } from '@src/background/log';
 import { chatHistoryStore } from '@extension/storage/lib/chat';
-import { memoryStore, requiresPlanApproval, estimateCostUsd } from '@extension/storage';
+import { memoryStore, observedModelsStore, requiresPlanApproval, estimateCostUsd } from '@extension/storage';
 import { URLNotAllowedError } from '../browser/views';
 import { TabGroupStatus } from '../browser/tabGroup';
 import { analytics } from '../services/analytics';
@@ -37,6 +37,8 @@ export interface ExecutorExtraArgs {
   plannerLLM?: BaseChatModel;
   fastLLM?: BaseChatModel;
   extractorLLM?: BaseChatModel;
+  /** The name the extractor's tokens should be booked under; defaults to the navigator's model name. */
+  extractorModelName?: string;
   agentOptions?: Partial<AgentOptions>;
   generalSettings?: GeneralSettingsConfig;
   /** The user's own USD-per-MTok price entries, snapshotted at task start for the budget brake. */
@@ -89,6 +91,15 @@ export class Executor {
    * from the user, so the brake does not re-fire every step after that for the rest of the run.
    */
   private budgetPauseIssued = false;
+  /**
+   * Corrections the user typed while the run was in flight, waiting for the top of the next step.
+   *
+   * A queue rather than a single slot: a user watching the agent go wrong types in bursts, and the
+   * second sentence is usually the one that explains the first. Applied at a step boundary rather
+   * than the moment they arrive, because the alternative is mutating the message history underneath
+   * a model call that is already in flight.
+   */
+  private pendingSteers: string[] = [];
   constructor(
     task: string,
     taskId: string,
@@ -133,19 +144,26 @@ export class Executor {
 
     // Subtasks reuse the navigator's model and the parent's browser config, so they obey the same
     // firewall and timing rules as the main agent rather than quietly getting their own.
-    const actionBuilder = new ActionBuilder(context, extractorLLM, {
-      navigatorLLM,
-      agentOptions: context.options,
-      getBrowserConfig: () => browserContext.getConfig(),
-      // subtasks spend on the parent's behalf, so their tokens belong in the parent's total
-      usage: context.tokenUsage,
-      // and they collect on the parent's behalf, so their rows belong in the parent's table
-      dataset: context.dataset,
-      provider: extraArgs?.providers?.navigator,
-      // and they stop when the parent stops, rather than running out their step budget in tabs
-      // nobody is watching
-      getParentSignal: () => context.controller.signal,
-    });
+    const actionBuilder = new ActionBuilder(
+      context,
+      extractorLLM,
+      {
+        navigatorLLM,
+        agentOptions: context.options,
+        getBrowserConfig: () => browserContext.getConfig(),
+        // subtasks spend on the parent's behalf, so their tokens belong in the parent's total
+        usage: context.tokenUsage,
+        // and they collect on the parent's behalf, so their rows belong in the parent's table
+        dataset: context.dataset,
+        provider: extraArgs?.providers?.navigator,
+        // and they stop when the parent stops, rather than running out their step budget in tabs
+        // nobody is watching
+        getParentSignal: () => context.controller.signal,
+      },
+      // The name the caller configured, so the extractor's tokens land under the key the pricing
+      // page is keyed by. Absent it, ActionBuilder falls back to whatever the adapter exposes.
+      extraArgs?.extractorModelName,
+    );
     const navigatorActionRegistry = new NavigatorActionRegistry(actionBuilder.buildDefaultActions());
 
     // Initialize agents with their respective prompts
@@ -207,6 +225,37 @@ export class Executor {
     this.context.eventManager.clearSubscribers(EventType.EXECUTION);
   }
 
+  /**
+   * Take a correction from the user while the task is still running.
+   *
+   * Deliberately not addFollowUpTask: that resets the plan gate, the final answer and the collected
+   * table because a follow-up is a new intent. A steer is the opposite - the intent is unchanged,
+   * and everything gathered so far stays. Nothing is applied here; the run picks it up at its next
+   * step boundary.
+   */
+  steer(text: string): void {
+    const trimmed = text.trim();
+    if (!trimmed) return;
+    this.pendingSteers.push(trimmed);
+    logger.info(`Steer queued: ${trimmed}`);
+  }
+
+  /**
+   * Fold any queued corrections into the conversation, at a step boundary.
+   *
+   * @returns whether anything was applied, which the loop uses to force a re-plan
+   */
+  private applyPendingSteers(): boolean {
+    if (this.pendingSteers.length === 0) return false;
+    const steers = this.pendingSteers;
+    this.pendingSteers = [];
+    for (const steer of steers) {
+      this.context.messageManager.addSteer(steer);
+      this.context.emitEvent(Actors.SYSTEM, ExecutionState.STEP_OK, t('exec_steer_applied', [steer]));
+    }
+    return true;
+  }
+
   addFollowUpTask(task: string): void {
     this.tasks.push(task);
     this.context.messageManager.addNewTask(task);
@@ -260,6 +309,13 @@ export class Executor {
 
     try {
       this.context.emitEvent(Actors.SYSTEM, ExecutionState.TASK_START, this.context.taskId);
+      // Announce the agent on the page before it touches anything: the whole point of the banner is
+      // that a tab typing on its own is never a surprise. The stop button on it reaches this
+      // Executor, which is the same cancel the side panel's button calls.
+      this.context.browserContext.setActivityStopHandler(() => {
+        void this.cancel();
+      });
+      void this.context.browserContext.showActivity('').catch(() => undefined);
       // Label the group with the task the user typed, not the generated task id, which means
       // nothing to them. Follow-up tasks re-label the group they are continuing.
       this.context.browserContext.startTaskGroup(this.tasks[this.tasks.length - 1]);
@@ -288,8 +344,14 @@ export class Executor {
           break;
         }
 
-        // Run planner periodically for guidance
-        if (this.planner && (context.nSteps % context.options.planningInterval === 0 || navigatorDone)) {
+        // After shouldStop, so a correction typed during a pause lands on the step that actually
+        // runs rather than being spent on one the user then cancelled.
+        const steered = this.applyPendingSteers();
+
+        // Run planner periodically for guidance, and always right after a correction: next_steps is
+        // where the old direction is written down, so leaving it stale means the navigator reads
+        // the correction and the plan contradicting it in the same breath.
+        if (this.planner && (steered || context.nSteps % context.options.planningInterval === 0 || navigatorDone)) {
           navigatorDone = false;
           justPlanned = true;
           latestPlanOutput = await this.runPlanner();
@@ -367,6 +429,17 @@ export class Executor {
         void analytics.trackTaskFailed(this.context.taskId, errorCategory);
       }
     } finally {
+      // Record which model names the providers actually answered under, so the pricing page can
+      // offer a row for each of them. Without this a name that differs from the assigned one has no
+      // row, no price, and contributes nothing to the dollar total while spending real money.
+      const spentUnder = this.context.tokenUsage.snapshot().byModel.map(entry => entry.model);
+      void observedModelsStore.record(spentUnder).catch(() => undefined);
+
+      // The run is over however it ended, so the page stops claiming otherwise. Before the tab-group
+      // stamp, because that one can await a Chrome call that outlives the user's attention.
+      await this.context.browserContext.hideActivity();
+      this.context.browserContext.setActivityStopHandler(null);
+
       // Stamp the outcome on the tab-group chip whichever way execute() ended, including the throw
       // paths above, so a group is never left reading "in progress" after the run is over.
       await this.context.browserContext.finishTaskGroup(tabGroupStatus);

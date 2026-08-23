@@ -2,11 +2,13 @@ import { memo, useMemo, useState } from 'react';
 import { t } from '@extension/i18n';
 import { ACTOR_PROFILES } from '../types/message';
 import { splitMarkdownTables, tableToCsv } from '../markdownTable';
+import { hasRichMarkup, parseRichText } from '../markdownRich';
 import { datasetFilename, saveTextFile } from '../download';
 import ResultDataset, { DownloadKey } from './ResultDataset';
 import StepTrail from './StepTrail';
 import type { Message } from '@extension/storage';
 import type { TableBlock } from '../markdownTable';
+import type { InlineSpan } from '../markdownRich';
 
 interface MessageListProps {
   messages: Message[];
@@ -94,20 +96,98 @@ function MessageContent({ content, timestamp }: { content: string; timestamp: nu
   const blocks = useMemo(() => splitMarkdownTables(content), [content]);
 
   if (blocks.length === 1 && blocks[0].type === 'text') {
-    return <div className="whitespace-pre-wrap break-words">{content}</div>;
+    return <RichText text={content} />;
   }
 
   return (
     <div className="flex min-w-0 flex-col gap-2">
       {blocks.map((block, index) =>
         block.type === 'text' ? (
-          <div key={index} className="whitespace-pre-wrap break-words">
-            {block.text}
-          </div>
+          <RichText key={index} text={block.text} />
         ) : (
           <ResultTable key={index} table={block} timestamp={timestamp} />
         ),
       )}
+    </div>
+  );
+}
+
+/** The emphasised runs inside one line: accented weight for a key term, a chip for a literal. */
+function InlineSpans({ spans }: { spans: InlineSpan[] }) {
+  return (
+    <>
+      {spans.map((span, index) => {
+        if (span.kind === 'strong') {
+          return (
+            <strong key={index} className="font-semibold text-accent-strong">
+              {span.text}
+            </strong>
+          );
+        }
+        if (span.kind === 'code') {
+          // Sunk rather than raised: a literal is something the page already contains, not a
+          // control the user can press, and the inset well says that without a border.
+          return (
+            <code
+              key={index}
+              className="rounded-[5px] bg-accent-soft px-1 py-px font-mono text-[0.92em] text-accent shadow-neu-inset-sm">
+              {span.text}
+            </code>
+          );
+        }
+        return <span key={index}>{span.text}</span>;
+      })}
+    </>
+  );
+}
+
+/**
+ * Message text with headings, lists and inline emphasis rendered.
+ *
+ * A message with none of those keeps the original single pre-wrap div, so the overwhelmingly common
+ * one-sentence status line costs exactly what it did before.
+ */
+function RichText({ text }: { text: string }) {
+  const blocks = useMemo(() => (hasRichMarkup(text) ? parseRichText(text) : null), [text]);
+
+  if (!blocks) {
+    return <div className="whitespace-pre-wrap break-words">{text}</div>;
+  }
+
+  return (
+    <div className="flex min-w-0 flex-col break-words">
+      {blocks.map((block, index) => {
+        if (block.kind === 'heading') {
+          // First heading sits flush; later ones get air above, so sections separate without rules.
+          return (
+            <h3 key={index} className={`text-[0.95rem] font-semibold text-ink ${index === 0 ? '' : 'mt-2.5'}`}>
+              <InlineSpans spans={block.spans} />
+            </h3>
+          );
+        }
+
+        if (block.kind === 'bullet' || block.kind === 'ordered') {
+          return (
+            <div key={index} className="flex gap-1.5 pl-1">
+              <span aria-hidden className="shrink-0 select-none text-accent">
+                {block.kind === 'ordered' ? block.marker : '•'}
+              </span>
+              <span className="min-w-0 flex-1">
+                <InlineSpans spans={block.spans} />
+              </span>
+            </div>
+          );
+        }
+
+        // A blank line is real vertical space in agent prose, not noise to collapse.
+        if (block.spans.length === 0) return <div key={index} className="h-2" />;
+
+        return (
+          <div key={index} className="whitespace-pre-wrap">
+            <InlineSpans spans={block.spans} />
+          </div>
+        );
+      })}
     </div>
   );
 }

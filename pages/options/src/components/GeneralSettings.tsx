@@ -141,6 +141,19 @@ export const GeneralSettings = () => {
 
         <Divider />
 
+        <SettingRow
+          title={t('options_general_activityOverlay')}
+          description={t('options_general_activityOverlay_desc')}>
+          <Toggle
+            id="showActivityOverlay"
+            label={t('options_general_activityOverlay')}
+            checked={settings.showActivityOverlay}
+            onChange={checked => updateSetting('showActivityOverlay', checked)}
+          />
+        </SettingRow>
+
+        <Divider />
+
         <SettingRow title={t('options_general_groupTaskTabs')} description={t('options_general_groupTaskTabs_desc')}>
           <Toggle
             id="groupTaskTabs"

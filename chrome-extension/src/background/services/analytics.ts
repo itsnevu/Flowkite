@@ -191,6 +191,22 @@ export class AnalyticsService {
     }
   }
 
+  /**
+   * The one thing here the user typed rather than triggered: a three-way rating of how the session
+   * is going. No free text and no task context travels with it - the rating alone is what was
+   * asked for, and anything more would be collection the feedback strip never disclosed.
+   */
+  async trackSessionFeedback(rating: 'bad' | 'fine' | 'good'): Promise<void> {
+    if (!this.enabled || !this.initialized) return;
+
+    try {
+      posthog.capture('session_feedback', { rating, timestamp: Date.now() });
+      logger.debug('Tracked session feedback:', rating);
+    } catch (error) {
+      logger.error('Failed to track session feedback:', error);
+    }
+  }
+
   async trackDomainVisit(url: string): Promise<void> {
     if (!this.enabled || !this.initialized) return;
 
