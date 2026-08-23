@@ -17,12 +17,13 @@ import {
 import { DOMElementNode, type DOMState } from './dom/views';
 import {
   ACTIVITY_STOP_BINDING,
-  flashActivityCapture,
-  moveActivityCursor,
-  pulseActivityTarget,
+  markActivityTarget as _markActivityTarget,
+  prepareForCapture,
+  restoreAfterCapture,
+  readVisibleTextWithoutOverlay,
   removeActivityOverlay,
   renderActivityOverlay,
-  setActivityOverlayHidden,
+  sanitizeOverlayDetail,
   takeActivityStopRequest,
   type ActivityOverlayContent,
   type ActivityTargetRect,
@@ -47,6 +48,9 @@ const CLICK_DEADLINE_MS = 2000;
 
 /** How often the overlay's stop button is polled, on the pages where its binding did not install. */
 const ACTIVITY_STOP_POLL_MS = 500;
+
+/** The same poll on a tab that is not on screen, where nobody can be pressing anything. */
+const ACTIVITY_STOP_POLL_HIDDEN_MS = 3000;
 
 /**
  * The absolute ceiling on waiting for a click to settle.
@@ -324,12 +328,22 @@ export default class Page {
    * can be answered by redrawing the same content rather than by losing it.
    */
   private _activityContent: ActivityOverlayContent | null = null;
+  /**
+   * What was last actually drawn, keyed by url as well as text.
+   *
+   * The url is half the key because a navigation destroys the overlay along with the document: the
+   * same sentence on a new page is a redraw, not a repeat. Same-document losses are caught the
+   * other way, by `markActivityTarget` reporting that the host was gone.
+   */
+  private _activityDrawnKey: string | null = null;
+  /** Where the drawn cursor was left, so a fresh document can start it there instead of offscreen. */
+  private _activityCursorAt: { x: number; y: number } | null = null;
   /** Called when the user presses the overlay's stop button. Set by the BrowserContext. */
   private _activityStopHandler: (() => void) | null = null;
   /** Whether `ACTIVITY_STOP_BINDING` has been bound on this page. Binding twice throws. */
   private _activityStopBound = false;
   /** Set only when the binding did not take, and the stop button has to be polled for instead. */
-  private _activityStopPoll: ReturnType<typeof setInterval> | null = null;
+  private _activityStopPoll: ReturnType<typeof setTimeout> | null = null;
 
   setActivityStopHandler(handler: (() => void) | null): void {
     this._activityStopHandler = handler;
@@ -343,26 +357,47 @@ export default class Page {
    * line stays current. Failures are swallowed - a page that will not take the banner (a PDF
    * viewer, a document mid-navigation) is still a page the agent must be allowed to work on.
    */
-  async showActivityOverlay(content: ActivityOverlayContent): Promise<void> {
+  async showActivityOverlay(content: ActivityOverlayContent, force = false): Promise<void> {
     if (!this._validWebPage || !this._puppeteerPage) return;
-    this._activityContent = content;
+    // The agent's own words never reach the page unfiltered - see sanitizeOverlayDetail for why a
+    // badge is worth attacking at all.
+    const safe: ActivityOverlayContent = {
+      ...content,
+      detail: sanitizeOverlayDetail(content.detail),
+      cursorAt: this._activityCursorAt,
+    };
+    this._activityContent = safe;
+
+    const key = `${this.url()}\u0000${safe.title}\u0000${safe.detail}`;
+    if (!force && key === this._activityDrawnKey) return;
+
     try {
       await this._bindActivityStop();
-      await this._puppeteerPage.evaluate(renderActivityOverlay, content);
+      await this._puppeteerPage.evaluate(renderActivityOverlay, safe);
+      this._activityDrawnKey = key;
     } catch (error) {
       logger.debug('Could not draw the activity overlay:', error);
+      this._activityDrawnKey = null;
     }
   }
 
   /** Move the drawn cursor onto an element and ring it, just before the agent acts on it. */
   async markActivityTarget(element: ElementHandle): Promise<void> {
-    if (!this._activityContent || !this._puppeteerPage) return;
+    const content = this._activityContent;
+    if (!content || !this._puppeteerPage) return;
     try {
       const box = await element.boundingBox();
       if (!box) return;
       const rect: ActivityTargetRect = { x: box.x, y: box.y, width: box.width, height: box.height };
-      await this._puppeteerPage.evaluate(moveActivityCursor, rect);
-      await this._puppeteerPage.evaluate(pulseActivityTarget, rect);
+      this._activityCursorAt = { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
+      const drawn = await this._puppeteerPage.evaluate(_markActivityTarget, rect);
+      if (!drawn) {
+        // The host went with a document rebuild the url never announced. This is the repair that
+        // lets showActivityOverlay skip redundant redraws without risking a banner that stays gone.
+        this._activityDrawnKey = null;
+        await this.showActivityOverlay(content, true);
+        await this._puppeteerPage.evaluate(_markActivityTarget, rect);
+      }
     } catch (error) {
       logger.debug('Could not mark the activity target:', error);
     }
@@ -371,37 +406,14 @@ export default class Page {
   /** Take the banner off this page and forget it, so a later navigation does not bring it back. */
   async hideActivityOverlay(): Promise<void> {
     this._activityContent = null;
+    this._activityDrawnKey = null;
+    this._activityCursorAt = null;
     this._stopActivityStopPolling();
     if (!this._puppeteerPage) return;
     try {
       await this._puppeteerPage.evaluate(removeActivityOverlay);
     } catch (error) {
       logger.debug('Could not remove the activity overlay:', error);
-    }
-  }
-
-  /**
-   * Run something with the overlay switched off.
-   *
-   * Every read of the page the model will see goes through here. The banner is drawn for the user
-   * and only for the user: in a screenshot it is a caption the model tries to read, and in the
-   * extracted text it is a line of prose that was never on the page.
-   */
-  private async _withActivityOverlayHidden<T>(read: () => Promise<T>): Promise<T> {
-    if (!this._activityContent || !this._puppeteerPage) return read();
-    try {
-      await this._puppeteerPage.evaluate(setActivityOverlayHidden, true);
-    } catch {
-      // Nothing to hide, or the page went away; the read is what matters.
-    }
-    try {
-      return await read();
-    } finally {
-      try {
-        await this._puppeteerPage.evaluate(setActivityOverlayHidden, false);
-      } catch {
-        // The overlay is redrawn on the next action anyway.
-      }
     }
   }
 
@@ -447,25 +459,32 @@ export default class Page {
    */
   private _startActivityStopPolling(): void {
     if (this._activityStopPoll) return;
-    this._activityStopPoll = setInterval(() => {
-      if (!this._activityContent || !this._puppeteerPage) return;
-      this._puppeteerPage
-        .evaluate(takeActivityStopRequest)
-        .then(requested => {
+    const tick = async () => {
+      let next = ACTIVITY_STOP_POLL_MS;
+      if (this._activityContent && this._puppeteerPage) {
+        try {
+          const { requested, hidden } = await this._puppeteerPage.evaluate(takeActivityStopRequest);
           if (requested) {
             logger.info('Stop requested from the on-page overlay (polled)');
             this._activityStopHandler?.();
           }
-        })
-        .catch(() => {
+          // Nobody presses a button on a tab they are not looking at. Backing off there is what
+          // keeps this fallback from being a CDP round-trip every half second for a whole task.
+          next = hidden ? ACTIVITY_STOP_POLL_HIDDEN_MS : ACTIVITY_STOP_POLL_MS;
+        } catch {
           // A navigation in flight, or a page that has gone away. The next tick asks again.
-        });
-    }, ACTIVITY_STOP_POLL_MS);
+        }
+      }
+      // Rescheduled rather than an interval, so a slow round trip cannot stack ticks on top of
+      // each other, and so the delay can change with what the last tick found.
+      if (this._activityStopPoll) this._activityStopPoll = setTimeout(tick, next);
+    };
+    this._activityStopPoll = setTimeout(tick, ACTIVITY_STOP_POLL_MS);
   }
 
   private _stopActivityStopPolling(): void {
     if (!this._activityStopPoll) return;
-    clearInterval(this._activityStopPoll);
+    clearTimeout(this._activityStopPoll);
     this._activityStopPoll = null;
   }
 
@@ -708,13 +727,10 @@ export default class Page {
     if (!this._puppeteerPage) {
       throw new Error('Puppeteer page is not connected');
     }
-    return this._withActivityOverlayHidden(async () => {
-      // innerText is layout-based, so the banner's own words would land in the extracted text if it
-      // were merely behind a shadow root rather than switched off.
-      const page = this._puppeteerPage;
-      if (!page) throw new Error('Puppeteer page is not connected');
-      return page.evaluate(() => document.body?.innerText ?? '');
-    });
+    // innerText is layout-based, so the banner's own words would land in the extracted text if it
+    // were merely behind a shadow root rather than switched off. Parked and restored inside the one
+    // evaluate, so the page never spends a worker round-trip with the banner missing.
+    return this._puppeteerPage.evaluate(readVisibleTextWithoutOverlay);
   }
 
   getCachedState(): PageState | null {
@@ -880,14 +896,7 @@ export default class Page {
     if (!this._puppeteerPage) {
       throw new Error('Puppeteer page is not connected');
     }
-    const screenshot = await this._withActivityOverlayHidden(() => this._captureScreenshot(fullPage));
-    // Flashed after the capture and after the overlay is back, never before: a flash that made it
-    // into the frame would be a white page handed to the model. Not awaited - the animation is for
-    // the user, and the agent has no reason to wait out 400ms of it.
-    if (this._activityContent) {
-      this._puppeteerPage?.evaluate(flashActivityCapture).catch(() => undefined);
-    }
-    return screenshot;
+    return this._captureScreenshot(fullPage);
   }
 
   private async _captureScreenshot(fullPage: boolean): Promise<string | null> {
@@ -895,22 +904,11 @@ export default class Page {
       throw new Error('Puppeteer page is not connected');
     }
 
+    const announcing = this._activityContent !== null;
     try {
-      // First disable animations/transitions
-      await this._puppeteerPage.evaluate(() => {
-        const styleId = 'puppeteer-disable-animations';
-        if (!document.getElementById(styleId)) {
-          const style = document.createElement('style');
-          style.id = styleId;
-          style.textContent = `
-            *, *::before, *::after {
-              animation: none !important;
-              transition: none !important;
-            }
-          `;
-          document.head.appendChild(style);
-        }
-      });
+      // Park the banner and freeze animations together: the overlay is drawn for the user, and in a
+      // screenshot it is a caption the model tries to read.
+      await this._puppeteerPage.evaluate(prepareForCapture);
 
       // Take the screenshot using JPEG format with 80% quality
       const screenshot = await this._puppeteerPage.screenshot({
@@ -920,16 +918,16 @@ export default class Page {
         quality: 80, // Good balance between quality and file size
       });
 
-      // Clean up the style element
-      await this._puppeteerPage.evaluate(() => {
-        const style = document.getElementById('puppeteer-disable-animations');
-        if (style) {
-          style.remove();
-        }
-      });
+      // Restore and, if the agent is announcing itself, flash - so a capture is a visible event
+      // rather than a silent one. Not awaited: the animation is for the user, and the agent has no
+      // reason to wait out 400ms of it.
+      void this._puppeteerPage.evaluate(restoreAfterCapture, announcing).catch(() => undefined);
 
       return screenshot as string;
     } catch (error) {
+      // The restore has to run even when the capture threw, or the page is left with its animations
+      // frozen and its banner missing.
+      void this._puppeteerPage?.evaluate(restoreAfterCapture, false).catch(() => undefined);
       logger.error('Failed to take screenshot:', error);
       throw error;
     }

@@ -2,12 +2,13 @@ import { describe, it, expect } from 'vitest';
 import {
   ACTIVITY_OVERLAY_ID,
   ACTIVITY_STOP_BINDING,
-  flashActivityCapture,
-  moveActivityCursor,
-  pulseActivityTarget,
+  markActivityTarget,
+  prepareForCapture,
+  readVisibleTextWithoutOverlay,
   removeActivityOverlay,
   renderActivityOverlay,
-  setActivityOverlayHidden,
+  restoreAfterCapture,
+  sanitizeOverlayDetail,
   takeActivityStopRequest,
 } from '../activityOverlay';
 
@@ -24,16 +25,54 @@ import {
  */
 const INJECTED = {
   renderActivityOverlay,
-  moveActivityCursor,
-  pulseActivityTarget,
-  flashActivityCapture,
-  setActivityOverlayHidden,
+  markActivityTarget,
+  prepareForCapture,
+  restoreAfterCapture,
+  readVisibleTextWithoutOverlay,
   takeActivityStopRequest,
   removeActivityOverlay,
 };
 
 /** Names that exist in this module and must therefore never appear inside an injected function. */
 const MODULE_SCOPE = ['ACTIVITY_OVERLAY_ID', 'ACTIVITY_STOP_BINDING', 'INJECTED', 'MODULE_SCOPE'];
+
+/**
+ * The detail line is written by the model, and the model reads the page. Everything here is about
+ * one question: can a page get its own sentence printed inside Flowkite's badge, where a user reads
+ * it as Flowkite talking?
+ */
+describe('sanitizeOverlayDetail', () => {
+  it('leaves an ordinary intent alone', () => {
+    expect(sanitizeOverlayDetail('Clicking the Submit button')).toBe('Clicking the Submit button');
+  });
+
+  it('flattens line breaks, which is how a second fake line would be drawn', () => {
+    expect(sanitizeOverlayDetail('Working\n\nFlowkite has stopped')).toBe('Working Flowkite has stopped');
+  });
+
+  it('strips control characters', () => {
+    expect(sanitizeOverlayDetail('Clicking\u0007\u0000 Submit')).toBe('Clicking Submit');
+  });
+
+  it('strips bidi overrides, which can reorder a line into a different sentence', () => {
+    expect(sanitizeOverlayDetail('Reading \u202eevil\u202c page')).toBe('Reading evil page');
+    expect(sanitizeOverlayDetail('safe\u2066\u2069')).toBe('safe');
+  });
+
+  it('caps the length so the agent line cannot crowd out the product name', () => {
+    const long = sanitizeOverlayDetail('x'.repeat(500));
+    expect(long.length).toBeLessThanOrEqual(88);
+    expect(long.endsWith('…')).toBe(true);
+  });
+
+  it('collapses runs of whitespace rather than letting them pad the line', () => {
+    expect(sanitizeOverlayDetail('   Clicking      Submit   ')).toBe('Clicking Submit');
+  });
+
+  it('answers empty for an intent that was only formatting', () => {
+    expect(sanitizeOverlayDetail('\n\t  \u200e ')).toBe('');
+  });
+});
 
 describe('injected overlay functions', () => {
   for (const [name, fn] of Object.entries(INJECTED)) {
@@ -47,10 +86,10 @@ describe('injected overlay functions', () => {
 
   it('every function that looks the host up spells the id out', () => {
     const lookups = [
-      moveActivityCursor,
-      pulseActivityTarget,
-      flashActivityCapture,
-      setActivityOverlayHidden,
+      markActivityTarget,
+      prepareForCapture,
+      restoreAfterCapture,
+      readVisibleTextWithoutOverlay,
       takeActivityStopRequest,
       removeActivityOverlay,
       renderActivityOverlay,
@@ -68,6 +107,19 @@ describe('injected overlay functions', () => {
     // buildDomTree.js cannot import this constant - it is a plain script injected into the page -
     // so the two spellings are kept honest here instead.
     expect(ACTIVITY_OVERLAY_ID).toBe('flowkite-activity-overlay');
+  });
+
+  it('the product line and the agent-written line are separate elements', () => {
+    // The badge is a trust surface: only Flowkite's own words may sit inside the bordered pill, and
+    // the model's sentence has to be visibly a different thing. Nesting the detail back into
+    // `.badge` would type-check and look fine, and would quietly undo that.
+    const markup = renderActivityOverlay.toString();
+    const badgeOpen = markup.indexOf('<div class="badge">');
+    const detailOpen = markup.indexOf('<div class="detail">');
+    expect(badgeOpen).toBeGreaterThan(-1);
+    expect(detailOpen).toBeGreaterThan(badgeOpen);
+    // The badge has to have closed before the detail opens, or the agent's line is inside the pill.
+    expect(markup.slice(badgeOpen, detailOpen)).toContain('</div>');
   });
 
   it('nothing in the overlay can swallow a click except the stop button', () => {

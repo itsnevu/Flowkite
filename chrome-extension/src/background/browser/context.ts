@@ -11,6 +11,7 @@ import {
   URLNotAllowedError,
 } from './views';
 import Page, { build_initial_state } from './page';
+import { sanitizeOverlayDetail } from './activityOverlay';
 import { isUrlAllowed } from './util';
 import TaskTabGroup, { type TabGroupStatus } from './tabGroup';
 
@@ -151,11 +152,13 @@ export default class BrowserContext {
    */
   public async showActivity(detail: string): Promise<void> {
     if (!this._config.showActivityOverlay) return;
-    this._activityDetail = detail;
+    // Stored sanitised, not just drawn sanitised: this same string is replayed onto every tab the
+    // task moves to, and a second path onto the page must not be a second chance to get raw text there.
+    this._activityDetail = sanitizeOverlayDetail(detail);
     const page = this._currentTabId !== null ? this._attachedPages.get(this._currentTabId) : undefined;
     await page?.showActivityOverlay({
       title: t('bg_overlay_active'),
-      detail,
+      detail: this._activityDetail,
       stopLabel: t('bg_overlay_stop'),
     });
   }

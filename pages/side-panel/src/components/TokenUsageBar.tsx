@@ -38,6 +38,20 @@ const TokenUsageBar = ({ usage, prices }: TokenUsageBarProps) => {
   const { total, byModel, unreportedCalls } = usage;
 
   const estimate = useMemo(() => estimateCostUsd(byModel, prices ?? {}), [byModel, prices]);
+  /**
+   * Each row's own cost, priced once per usage update rather than once per render.
+   *
+   * This strip re-renders on every token event of a running task, and the rows were each running a
+   * fresh estimate every time - the same arithmetic, over the same numbers, several times a second.
+   */
+  const rows = useMemo(
+    () =>
+      byModel.map(entry => {
+        const line = estimateCostUsd([entry], prices ?? {});
+        return { entry, usd: line.usd, priced: line.unpricedModels.length === 0 };
+      }),
+    [byModel, prices],
+  );
   const anyPriced = byModel.length > estimate.unpricedModels.length;
   /** The floor marker: unreported calls or unpriced models both mean "at least this much". */
   const isFloor = unreportedCalls > 0 || estimate.unpricedModels.length > 0;
@@ -81,15 +95,13 @@ const TokenUsageBar = ({ usage, prices }: TokenUsageBarProps) => {
             {t('chat_usage_inOut', [exact.format(total.inputTokens), exact.format(total.outputTokens)])}
           </p>
           <ul className="mt-2 space-y-1.5">
-            {byModel.map(entry => {
-              const line = estimateCostUsd([entry], prices ?? {});
-              const priced = line.unpricedModels.length === 0;
+            {rows.map(({ entry, usd, priced }) => {
               return (
                 <li key={`${entry.agent}-${entry.model}`} className="flex items-baseline justify-between gap-3">
                   <span className="min-w-0 truncate text-xs text-ink">{entry.model}</span>
                   <span className="shrink-0 font-mono text-[11px] text-ink-faint">
                     {t('chat_usage_calls', String(entry.calls))} · {exact.format(entry.totalTokens)}
-                    {priced ? ` · ${usdFormat(line.usd)}` : ` · ${t('chat_usage_rowNoPrice')}`}
+                    {priced ? ` · ${usdFormat(usd)}` : ` · ${t('chat_usage_rowNoPrice')}`}
                   </span>
                 </li>
               );
