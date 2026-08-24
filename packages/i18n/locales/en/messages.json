@@ -149,6 +149,27 @@
   "chat_history_delete": {
     "message": "Delete session"
   },
+  "chat_history_search": {
+    "message": "Search your tasks"
+  },
+  "chat_history_search_clear": {
+    "message": "Clear search"
+  },
+  "chat_history_noMatch": {
+    "message": "No task matches $QUERY$",
+    "placeholders": {
+      "query": {
+        "content": "$1",
+        "example": "gmail invoice"
+      }
+    }
+  },
+  "chat_history_rename": {
+    "message": "Rename"
+  },
+  "chat_history_reuse": {
+    "message": "Use this task again"
+  },
   "chat_bookmarks_header": {
     "message": "Quick Start"
   },

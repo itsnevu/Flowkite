@@ -149,6 +149,27 @@
   "chat_history_delete": {
     "message": "Excluir sessão"
   },
+  "chat_history_search": {
+    "message": "Buscar suas tarefas"
+  },
+  "chat_history_search_clear": {
+    "message": "Limpar busca"
+  },
+  "chat_history_noMatch": {
+    "message": "Nenhuma tarefa corresponde a $QUERY$",
+    "placeholders": {
+      "query": {
+        "content": "$1",
+        "example": "gmail invoice"
+      }
+    }
+  },
+  "chat_history_rename": {
+    "message": "Renomear"
+  },
+  "chat_history_reuse": {
+    "message": "Usar esta tarefa de novo"
+  },
   "chat_bookmarks_header": {
     "message": "Início Rápido"
   },

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { generateNewTaskId, getCurrentTimestampStr, bookmarkTitleForSession } from '../utils';
+import { generateNewTaskId, getCurrentTimestampStr, bookmarkTitleForSession, filterSessionsByQuery } from '../utils';
 
 afterEach(() => {
   vi.useRealTimers();
@@ -61,5 +61,32 @@ describe('bookmarkTitleForSession', () => {
   it('round-trips: a stored title derives to itself, so an already-pinned session matches', () => {
     const stored = bookmarkTitleForSession('Compare the M4 Air reviews on three sites and give me the consensus');
     expect(bookmarkTitleForSession(stored)).toBe(stored);
+  });
+});
+
+describe('filterSessionsByQuery', () => {
+  const sessions = [
+    { title: 'Download the invoice from Gmail' },
+    { title: 'Compare laptop prices on Tokopedia' },
+    { title: 'Check GitHub issues' },
+  ];
+
+  it('returns everything for an empty or blank query', () => {
+    expect(filterSessionsByQuery(sessions, '')).toHaveLength(3);
+    expect(filterSessionsByQuery(sessions, '   ')).toHaveLength(3);
+  });
+
+  it('matches case-insensitively', () => {
+    expect(filterSessionsByQuery(sessions, 'GITHUB')).toEqual([{ title: 'Check GitHub issues' }]);
+  });
+
+  // How people actually remember a run: two words from it, in whatever order they come to mind.
+  it('requires every term but not their order', () => {
+    expect(filterSessionsByQuery(sessions, 'gmail invoice')).toEqual([{ title: 'Download the invoice from Gmail' }]);
+    expect(filterSessionsByQuery(sessions, 'invoice gmail')).toEqual([{ title: 'Download the invoice from Gmail' }]);
+  });
+
+  it('returns nothing when one term is absent', () => {
+    expect(filterSessionsByQuery(sessions, 'gmail tokopedia')).toEqual([]);
   });
 });

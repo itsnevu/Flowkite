@@ -402,6 +402,37 @@ const SidePanel = () => {
     }
   };
 
+  const handleSessionRename = async (sessionId: string, title: string) => {
+    try {
+      await chatHistoryStore.updateTitle(sessionId, title);
+      await loadChatSessions();
+    } catch (error) {
+      console.error('Failed to rename session:', error);
+    }
+  };
+
+  /**
+   * Send a past task back to the composer.
+   *
+   * Deliberately a prefill rather than an immediate re-run. A task usually comes back here because
+   * it went wrong, and the fix is nearly always a word or two in the prompt - re-running it
+   * untouched would just reproduce the failure, at the user's expense. It also lands the user back
+   * in the chat, because a composer they cannot see is a button that appears to do nothing.
+   */
+  const handleSessionReuse = async (sessionId: string) => {
+    try {
+      const fullSession = await chatHistoryStore.getSession(sessionId);
+      if (!fullSession) return;
+      // Same rule as bookmarking: the first message is the task the user typed, and the title
+      // stands in for a session whose messages were never stored.
+      const taskContent = fullSession.messages[0]?.content || fullSession.title;
+      handleBackToChat(true);
+      setInputTextRef.current?.(taskContent);
+    } catch (error) {
+      console.error('Failed to reuse session prompt:', error);
+    }
+  };
+
   /**
    * Pin a past session to the bookmark strip.
    *
@@ -492,6 +523,8 @@ const SidePanel = () => {
             onSessionSelect={handleSessionSelect}
             onSessionDelete={handleSessionDelete}
             onSessionBookmark={handleSessionBookmark}
+            onSessionRename={handleSessionRename}
+            onSessionReuse={handleSessionReuse}
             bookmarkedTitles={bookmarkedTitles}
             visible={true}
           />

@@ -149,6 +149,27 @@
   "chat_history_delete": {
     "message": "刪除工作階段"
   },
+  "chat_history_search": {
+    "message": "搜尋你的任務"
+  },
+  "chat_history_search_clear": {
+    "message": "清除搜尋"
+  },
+  "chat_history_noMatch": {
+    "message": "沒有任務符合 $QUERY$",
+    "placeholders": {
+      "query": {
+        "content": "$1",
+        "example": "gmail invoice"
+      }
+    }
+  },
+  "chat_history_rename": {
+    "message": "重新命名"
+  },
+  "chat_history_reuse": {
+    "message": "再次使用這個任務"
+  },
   "chat_bookmarks_header": {
     "message": "快速入門"
   },
