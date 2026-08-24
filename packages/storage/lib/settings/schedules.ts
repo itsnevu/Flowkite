@@ -23,6 +23,14 @@ export interface ScheduledTask {
   enabled: boolean;
   /** When it last actually ran, or null before the first run. */
   lastRunAt: number | null;
+  /**
+   * Watch mode: notify only when this run's collected rows differ from the previous run's.
+   *
+   * Off by default, because it changes what silence means - a watched schedule that says nothing
+   * has run and found no change, while an unwatched one that says nothing has failed to run at all.
+   * Only meaningful for tasks that collect a table; a prose answer is reported every time.
+   */
+  watch?: boolean;
 }
 
 export interface SchedulesConfig {
@@ -38,7 +46,13 @@ const storage = createStorage<SchedulesConfig>('scheduled-tasks', initialState, 
 });
 
 export type SchedulesStorage = BaseStorage<SchedulesConfig> & {
-  addSchedule: (input: { title: string; prompt: string; hour: number; minute: number }) => Promise<ScheduledTask>;
+  addSchedule: (input: {
+    title: string;
+    prompt: string;
+    hour: number;
+    minute: number;
+    watch?: boolean;
+  }) => Promise<ScheduledTask>;
   updateSchedule: (id: number, patch: Partial<Omit<ScheduledTask, 'id'>>) => Promise<void>;
   removeSchedule: (id: number) => Promise<void>;
   getAllSchedules: () => Promise<ScheduledTask[]>;
@@ -65,6 +79,7 @@ export const schedulesStore: SchedulesStorage = {
           minute: clampInt(input.minute, 0, 59),
           enabled: true,
           lastRunAt: null,
+          watch: input.watch ?? false,
         },
       ],
     }));

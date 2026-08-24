@@ -6,6 +6,7 @@ import { URLNotAllowedError } from '../browser/views';
 import { TabGroupStatus } from '../browser/tabGroup';
 import { analytics } from '../services/analytics';
 import { type ActionResult, AgentContext, type AgentOptions, type AgentOutput, DEFAULT_AGENT_OPTIONS } from './types';
+import { StallTracker, type StepGround } from './stall';
 import { NavigatorAgent, NavigatorActionRegistry } from './agents/navigator';
 import { PlannerAgent, type PlannerOutput } from './agents/planner';
 import { NavigatorPrompt } from './prompts/navigator';
@@ -100,6 +101,11 @@ export class Executor {
    * a model call that is already in flight.
    */
   private pendingSteers: string[] = [];
+  /**
+   * Watches for the run that is busy and going nowhere - every action succeeding, the page never
+   * moving. Per-Executor and reset per task, like the failure counter it complements.
+   */
+  private readonly stall = new StallTracker();
   constructor(
     task: string,
     taskId: string,
@@ -300,6 +306,7 @@ export class Executor {
     // second task on the same Executor inherited its predecessor's failure count, cancellation and
     // abort signal.
     context.resetForTask();
+    this.stall.reset();
     // Per-Executor rather than per-context, but per-task all the same: the brake is latched so it
     // asks once, and leaving it latched meant a follow-up spent with no ceiling at all.
     this.budgetPauseIssued = false;
@@ -370,6 +377,13 @@ export class Executor {
         // Execute navigator
         navigatorDone = await this.navigate(justPlanned);
         justPlanned = false;
+
+        // Read from the parse the model was shown this step, so noticing a stall costs no extra
+        // page read. Skipped once the navigator says it is done: the last step of a successful task
+        // legitimately leaves the page exactly as it found it.
+        if (!navigatorDone && !(await this.handleStall())) {
+          break;
+        }
 
         // If navigator indicates completion, the next periodic planner run will validate it
         if (navigatorDone) {
@@ -638,6 +652,50 @@ export class Executor {
 
     logger.info(`🔀 Routed step to ${decision.tier} model: ${decision.reason}`);
     return decision.tier === ModelTier.FAST ? this.fastNavigator : this.navigator;
+  }
+
+  /**
+   * Fold this step's ground into the stall tracker and act on the verdict.
+   *
+   * @returns whether the run should continue
+   */
+  private async handleStall(): Promise<boolean> {
+    const context = this.context;
+    const state = context.stepState;
+    if (!state) return true;
+
+    const elements = Array.from(state.selectorMap.values());
+    const ground: StepGround = {
+      url: state.url,
+      elementCount: elements.length,
+      // Null when the marking had no baseline this step, which the tracker reads as "unknown",
+      // never as "nothing new".
+      newElementCount: elements.some(element => element.isNew === null)
+        ? null
+        : elements.filter(element => element.isNew).length,
+      scrollY: state.scrollY,
+    };
+
+    const verdict = this.stall.record(ground);
+    // Read by the state-message builder, which attaches a screenshot while this is non-zero even
+    // with vision off. A page the DOM under-describes is the most common reason a run stalls, and
+    // that is exactly the case a screenshot answers.
+    context.stalledSteps = this.stall.steps;
+    if (verdict === 'continue') return true;
+
+    if (verdict === 'abort') {
+      logger.error(`Ending the run: ${this.stall.steps} steps changed nothing on the page`);
+      this.context.emitEvent(Actors.SYSTEM, ExecutionState.TASK_FAIL, t('exec_stall_abort'));
+      return false;
+    }
+
+    // Say it in the conversation, not just the log: the model is the one that has to change course,
+    // and it never sees the log. The screenshot that comes with the next read is usually what was
+    // missing - a page whose DOM under-describes it is the most common reason for this.
+    logger.warning(`${this.stall.steps} steps have changed nothing; nudging the navigator`);
+    this.context.messageManager.addRuntimeNote(t('exec_stall_nudge', [String(this.stall.steps)]));
+    this.context.emitEvent(Actors.SYSTEM, ExecutionState.STEP_OK, t('exec_stall_notice'));
+    return true;
   }
 
   private async navigate(justPlanned = false): Promise<boolean> {

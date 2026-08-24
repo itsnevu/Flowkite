@@ -251,6 +251,17 @@ export default class MessageManager {
   }
 
   /**
+   * Adds an observation the runtime made about the run itself, not something anyone said.
+   *
+   * Kept apart from addSteer on purpose: that one tells the model a human is watching and has just
+   * corrected it, which would be a lie here and would teach it that the runtime's own bookkeeping
+   * carries a user's authority. This is framed as what it is - a fact about the last few steps.
+   */
+  public addRuntimeNote(note: string): void {
+    this.addMessageWithTokens(new HumanMessage({ content: `<flowkite_runtime_note>${note}</flowkite_runtime_note>` }));
+  }
+
+  /**
    * Adds remembered user preferences to the history.
    *
    * These come from the local memory store, not from a page, so they are trusted input and are wrapped

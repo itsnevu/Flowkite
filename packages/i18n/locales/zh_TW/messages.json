@@ -423,6 +423,12 @@
   "options_sched_enable": {
     "message": "啟用"
   },
+  "options_sched_watch": {
+    "message": "只在有變化時通知我"
+  },
+  "options_sched_watch_desc": {
+    "message": "只有在收集到的資料與上次執行不同時才通知"
+  },
   "options_sched_delete": {
     "message": "刪除"
   },
@@ -972,6 +978,45 @@
       }
     }
   },
+  "bg_watch_changed_title": {
+    "message": "$TITLE$：有變化",
+    "placeholders": {
+      "title": {
+        "content": "$1",
+        "example": "Price watch"
+      }
+    }
+  },
+  "bg_watch_changed_body": {
+    "message": "自上次執行以來 $SUMMARY$。開啟 Flowkite 查看表格。",
+    "placeholders": {
+      "summary": {
+        "content": "$1",
+        "example": "2 new, 1 changed"
+      }
+    }
+  },
+  "bg_watch_first_body": {
+    "message": "這個監看的第一次執行：已記錄 $COUNT$ 列作為基準。",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "12"
+      }
+    }
+  },
+  "bg_watch_notTabular_title": {
+    "message": "$TITLE$：沒有可比較的內容",
+    "placeholders": {
+      "title": {
+        "content": "$1",
+        "example": "Price watch"
+      }
+    }
+  },
+  "bg_watch_notTabular_body": {
+    "message": "這次執行沒有收集到表格，因此無法監看變化。請讓任務把結果收集成列表。"
+  },
   "bg_sched_fail_title": {
     "message": "失敗：$TITLE$",
     "placeholders": {
@@ -1326,6 +1371,21 @@
         "example": "pilih yang termurah"
       }
     }
+  },
+  "exec_stall_nudge": {
+    "message": "你最近 $STEPS$ 個動作都回報成功，但頁面完全沒有變化－相同網址、相同元素、相同捲動位置。你點的東西沒有作用。不要再重複。請看截圖，改為操作其他元素、前往別的頁面，或在只有使用者能處理時使用 ask_user。",
+    "placeholders": {
+      "steps": {
+        "content": "$1",
+        "example": "3"
+      }
+    }
+  },
+  "exec_stall_notice": {
+    "message": "頁面已數個步驟沒有變化；改用其他方式"
+  },
+  "exec_stall_abort": {
+    "message": "已停止：頁面已數個步驟沒有變化，這條路無法推進任務。"
   },
   "bg_cmd_steer_notRunning": {
     "message": "只有在任務執行中才能即時指正。"

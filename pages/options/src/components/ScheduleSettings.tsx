@@ -108,12 +108,20 @@ export const ScheduleSettings = () => {
             <div key={schedule.id}>
               <SettingRow
                 title={`${schedule.title} — ${two(schedule.hour)}:${two(schedule.minute)}`}
-                description={
+                description={`${
                   schedule.lastRunAt
                     ? t('options_sched_lastRun', new Date(schedule.lastRunAt).toLocaleString())
                     : t('options_sched_never')
-                }>
+                }${schedule.watch ? ` — ${t('options_sched_watch_desc')}` : ''}`}>
                 <div className="flex items-center gap-3">
+                  {/* Watch changes what silence from this schedule means, so it is labelled on the
+                      row rather than hidden behind the prompt. */}
+                  <Toggle
+                    id={`sched-watch-${schedule.id}`}
+                    label={t('options_sched_watch')}
+                    checked={schedule.watch === true}
+                    onChange={checked => void schedulesStore.updateSchedule(schedule.id, { watch: checked })}
+                  />
                   <Toggle
                     id={`sched-enabled-${schedule.id}`}
                     label={t('options_sched_enable')}

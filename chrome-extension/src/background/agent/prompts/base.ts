@@ -2,8 +2,34 @@ import { HumanMessage, type SystemMessage } from '@langchain/core/messages';
 import { createLogger } from '@src/background/log';
 import { wrapUntrustedContent } from '../messages/utils';
 import type { AgentContext } from '@src/background/agent/types';
+import type { BrowserState } from '@src/background/browser/views';
 
 const logger = createLogger('BasePrompt');
+
+/**
+ * One line telling the model how much of this page is actually new since its last step.
+ *
+ * The `*` marking on individual elements is per-element and easy to miss in a list of several
+ * hundred; on a page where a click opened one dropdown, the twelve lines that matter are visually
+ * identical to the rest. Saying the count up front is what turns the marking into attention.
+ *
+ * Deliberately additive rather than a diff. The state message is dropped from history after every
+ * step (see NavigatorAgent.removeLastStateMessageFromMemory), so an element left out of this
+ * message is gone from the conversation entirely - and indices are renumbered per parse, so the
+ * model could not act on a collapsed one even if it remembered it. Sending less is a change to how
+ * history works, not a change to this string.
+ *
+ * Silent when there is no baseline (the first read of a page), because "0 new" and "no idea yet"
+ * are different facts and only one of them is worth telling the model.
+ */
+function changeInfo(state: BrowserState): string {
+  const elements = Array.from(state.selectorMap.values());
+  if (elements.length === 0 || elements.some(element => element.isNew === null)) return '';
+  const fresh = elements.filter(element => element.isNew).length;
+  return fresh === 0
+    ? `[Change since your last step] Nothing on this page is new. If your last action was meant to change something, it did not.\n`
+    : `[Change since your last step] ${fresh} of ${elements.length} elements are new, marked with * - look there first.\n`;
+}
 /**
  * Abstract base class for all prompt types
  */
@@ -32,9 +58,19 @@ abstract class BasePrompt {
     // the page (canvas widgets, mis-grounded indices), and retrying on the same blind description
     // just burns the failure budget; one screenshot per retry, bounded by maxFailures, is the
     // cheapest way out of that loop. Full-blind pages (domGroundingFailed) already do this.
-    const escalateVision = context.consecutiveFailures > 0;
+    // Two ways a step earns a screenshot: it failed, or the last few steps changed nothing at all.
+    // Both usually mean the DOM text under-describes the page, and both are cheapest to answer with
+    // one picture rather than another blind retry.
+    const escalateVision = context.consecutiveFailures > 0 || context.stalledSteps > 0;
     const stepVision = context.options.useVision || escalateVision;
-    const browserState = await context.browserContext.getState(stepVision);
+    // `true` is what actually turns on the `*[35]` marking the system prompt documents. Every
+    // caller left this false, so the hash of the previous parse was never kept, `isNew` stayed null
+    // on every element, and the prompt taught the model to read a signal that was never sent - on a
+    // page that opens a dropdown or a modal, the handful of elements that matter were indexed
+    // exactly like the several hundred that did not change. Only this call site sets it: this is
+    // the read the model is shown, and the probe reads elsewhere in the step must not shift the
+    // baseline that "new since the last step" is measured against.
+    const browserState = await context.browserContext.getState(stepVision, true);
     // This is the parse the model's element indices are numbered against; actions resolve them here
     // rather than re-reading the DOM, which would renumber the page under the model's feet.
     context.stepState = browserState;
@@ -51,7 +87,7 @@ abstract class BasePrompt {
       const scrollInfo = `[Scroll info of current page] scrolled: ${browserState.scrollY}px of ${scrollable}px, remaining below: ${remaining}px, viewport height: ${browserState.visualViewportHeight}px${scrollable === 0 ? ' (this page does not scroll)' : ''}\n`;
       logger.info(scrollInfo);
       const elementsText = wrapUntrustedContent(rawElementsText);
-      formattedElementsText = `${scrollInfo}[Start of page]\n${elementsText}\n[End of page]\n`;
+      formattedElementsText = `${scrollInfo}${changeInfo(browserState)}[Start of page]\n${elementsText}\n[End of page]\n`;
     } else if (browserState.domGroundingFailed && browserState.screenshot) {
       // Saying "empty page" here would be a lie the model acts on: it would conclude the task is
       // impossible and give up, when in fact the page is rendered and simply not readable via the DOM.

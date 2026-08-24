@@ -12,6 +12,8 @@ import {
   SESSION_FEEDBACK_RATINGS,
   schedulesStore,
   APPROVAL_MODES,
+  compareRuns,
+  describeComparison,
 } from '@extension/storage';
 import { t } from '@extension/i18n';
 import { SCHEDULE_ALARM_PREFIX, scheduleIdFromAlarmName, syncScheduleAlarms } from './services/scheduler';
@@ -697,7 +699,14 @@ async function runScheduledTask(schedule: ScheduledTask): Promise<void> {
     return;
   }
   await schedulesStore.markRun(schedule.id, Date.now());
-  await runUnattendedTask({ prompt: schedule.prompt, title: schedule.title, source: 'scheduled', chain: 0 });
+  await runUnattendedTask({
+    prompt: schedule.prompt,
+    title: schedule.title,
+    source: 'scheduled',
+    chain: 0,
+    scheduleId: schedule.id,
+    watch: schedule.watch === true,
+  });
 }
 
 /**
@@ -737,6 +746,10 @@ async function runUnattendedTask(input: {
   source: 'scheduled' | 'followup';
   /** webhook follow-ups completed before this run; 0 for a fresh schedule */
   chain: number;
+  /** the schedule this run belongs to, so its sessions can be compared with each other */
+  scheduleId?: number;
+  /** watch mode: stay silent unless the collected rows differ from the previous run's */
+  watch?: boolean;
 }): Promise<void> {
   logger.info(`Running unattended task "${input.title}" (${input.source})`);
 
@@ -814,9 +827,13 @@ async function runUnattendedTask(input: {
     }
   }
 
+  // Read BEFORE this run's session is written, or the comparison finds itself.
+  const previousRun =
+    input.watch && input.scheduleId !== undefined ? await previousScheduledDataset(input.scheduleId) : undefined;
+
   // The result lands in chat history so the side panel can show the full session later.
   try {
-    const session = await chatHistoryStore.createSession(input.title || input.prompt.slice(0, 60));
+    const session = await chatHistoryStore.createSession(input.title || input.prompt.slice(0, 60), input.scheduleId);
     await chatHistoryStore.addMessage(session.id, {
       actor: Actors.USER,
       content: input.prompt,
@@ -833,10 +850,52 @@ async function runUnattendedTask(input: {
     logger.error('Failed to save unattended task result:', error);
   }
 
+  if (input.watch && outcome.ok) {
+    const comparison = compareRuns(previousRun, collected);
+    if (!comparison.changed) {
+      // The point of a watch: silence means "ran, nothing moved". The session is still written, so
+      // the user can open the history and see that it ran.
+      logger.info(`Watch "${input.title}" found no change; no notification sent`);
+      return;
+    }
+    if (comparison.reason === 'not-tabular') {
+      // Prose is never compared - a model words the same fact differently every day - so say
+      // outright that this watch cannot stay silent rather than notifying as though it had changed.
+      notifySchedule(t('bg_watch_notTabular_title', [input.title]), t('bg_watch_notTabular_body'));
+      return;
+    }
+    notifySchedule(
+      t('bg_watch_changed_title', [input.title]),
+      comparison.reason === 'no-previous'
+        ? t('bg_watch_first_body', [String(comparison.added)])
+        : t('bg_watch_changed_body', [describeComparison(comparison)]),
+    );
+    return;
+  }
+
   notifySchedule(
     outcome.ok ? t('bg_sched_ok_title', [input.title]) : t('bg_sched_fail_title', [input.title]),
     outcome.text,
   );
+}
+
+/**
+ * The rows the previous run of this schedule collected, or undefined when there was none.
+ *
+ * Only the most recent session is loaded, and only its messages: a watch compares against the run
+ * before it, not against the whole history, and reading every session to find one would grow with
+ * the user's history forever.
+ */
+async function previousScheduledDataset(scheduleId: number): Promise<MessageDataset | undefined> {
+  try {
+    const [mostRecent] = await chatHistoryStore.getSessionsForSchedule(scheduleId);
+    if (!mostRecent) return undefined;
+    const session = await chatHistoryStore.getSession(mostRecent.id);
+    return session?.messages.find(message => message.dataset)?.dataset;
+  } catch (error) {
+    logger.error('Failed to read the previous run of this schedule:', error);
+    return undefined;
+  }
 }
 
 // Update subscribeToExecutorEvents to use port

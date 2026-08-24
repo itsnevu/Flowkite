@@ -67,6 +67,14 @@ export interface ChatSessionMetadata {
   createdAt: number; // Unix timestamp in milliseconds
   updatedAt: number; // Unix timestamp in milliseconds
   messageCount: number;
+  /**
+   * The schedule this session came from, when it was not started by hand.
+   *
+   * Stored as an id rather than matched on the title, which was the only join available before:
+   * titles are editable from two places now (the schedule's name and the history list's rename), and
+   * a comparison that silently stops matching is worse than no comparison at all.
+   */
+  scheduleId?: number;
 }
 
 // ChatSession is the full conversation history displayed in the Sidepanel
@@ -126,8 +134,16 @@ export interface ChatHistoryStorage {
   // Get a specific chat session with its messages
   getSession: (sessionId: string) => Promise<ChatSession | null>;
 
-  // Create a new chat session
-  createSession: (title: string) => Promise<ChatSession>;
+  // Create a new chat session; scheduleId marks the schedule an unattended run came from
+  createSession: (title: string, scheduleId?: number) => Promise<ChatSession>;
+
+  /**
+   * Sessions produced by one schedule, newest first, metadata only.
+   *
+   * Metadata only because the caller that needs this - the watch comparison - wants the most recent
+   * one and nothing else; loading every session's messages to find it would read the whole history.
+   */
+  getSessionsForSchedule: (scheduleId: number) => Promise<ChatSessionMetadata[]>;
 
   // Update an existing chat session
   updateTitle: (sessionId: string, title: string) => Promise<ChatSessionMetadata>;

@@ -112,7 +112,7 @@ export function createChatHistoryStorage(): ChatHistoryStorage {
       };
     },
 
-    createSession: async (title: string): Promise<ChatSession> => {
+    createSession: async (title: string, scheduleId?: number): Promise<ChatSession> => {
       const newSessionId = crypto.randomUUID();
       const currentTime = getCurrentTimestamp();
       const newSessionMeta: ChatSessionMetadata = {
@@ -121,6 +121,7 @@ export function createChatHistoryStorage(): ChatHistoryStorage {
         createdAt: currentTime,
         updatedAt: currentTime,
         messageCount: 0,
+        ...(scheduleId === undefined ? {} : { scheduleId }),
       };
 
       // Create empty messages array for the new session
@@ -134,6 +135,11 @@ export function createChatHistoryStorage(): ChatHistoryStorage {
         ...newSessionMeta,
         messages: [],
       };
+    },
+
+    getSessionsForSchedule: async (scheduleId: number): Promise<ChatSessionMetadata[]> => {
+      const sessions = await chatSessionsMetaStorage.get();
+      return sessions.filter(session => session.scheduleId === scheduleId).sort((a, b) => b.createdAt - a.createdAt);
     },
 
     updateTitle: async (sessionId: string, title: string): Promise<ChatSessionMetadata> => {

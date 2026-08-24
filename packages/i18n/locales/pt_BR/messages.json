@@ -423,6 +423,12 @@
   "options_sched_enable": {
     "message": "Ativado"
   },
+  "options_sched_watch": {
+    "message": "Só me avise quando mudar"
+  },
+  "options_sched_watch_desc": {
+    "message": "notifica apenas quando as linhas coletadas diferem da execução anterior"
+  },
   "options_sched_delete": {
     "message": "Excluir"
   },
@@ -972,6 +978,45 @@
       }
     }
   },
+  "bg_watch_changed_title": {
+    "message": "$TITLE$: algo mudou",
+    "placeholders": {
+      "title": {
+        "content": "$1",
+        "example": "Price watch"
+      }
+    }
+  },
+  "bg_watch_changed_body": {
+    "message": "$SUMMARY$ desde a última execução. Abra o Flowkite para ver a tabela.",
+    "placeholders": {
+      "summary": {
+        "content": "$1",
+        "example": "2 new, 1 changed"
+      }
+    }
+  },
+  "bg_watch_first_body": {
+    "message": "Primeira execução deste monitoramento: $COUNT$ linhas registradas como base.",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "12"
+      }
+    }
+  },
+  "bg_watch_notTabular_title": {
+    "message": "$TITLE$: nada para comparar",
+    "placeholders": {
+      "title": {
+        "content": "$1",
+        "example": "Price watch"
+      }
+    }
+  },
+  "bg_watch_notTabular_body": {
+    "message": "Esta execução não coletou nenhuma tabela, então não há o que monitorar. Peça à tarefa que colete os resultados como uma lista."
+  },
   "bg_sched_fail_title": {
     "message": "Falhou: $TITLE$",
     "placeholders": {
@@ -1326,6 +1371,21 @@
         "example": "pilih yang termurah"
       }
     }
+  },
+  "exec_stall_nudge": {
+    "message": "Suas últimas $STEPS$ ações retornaram sucesso, mas a página não mudou nada - mesma URL, mesmos elementos, mesma posição de rolagem. O que você está clicando não faz nada. NÃO repita. Olhe a captura de tela e interaja com outro elemento, navegue para outro lugar, ou use ask_user se só o usuário puder passar daqui.",
+    "placeholders": {
+      "steps": {
+        "content": "$1",
+        "example": "3"
+      }
+    }
+  },
+  "exec_stall_notice": {
+    "message": "A página não muda há vários passos; tentando outra abordagem"
+  },
+  "exec_stall_abort": {
+    "message": "Parado: a página não muda há vários passos, então a tarefa não avança por este caminho."
   },
   "bg_cmd_steer_notRunning": {
     "message": "Só é possível orientar enquanto uma tarefa está em execução."

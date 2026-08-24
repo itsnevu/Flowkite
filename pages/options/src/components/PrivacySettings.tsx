@@ -92,9 +92,7 @@ export const PrivacySettings = () => {
       {/* What went to model providers */}
       <div className="mt-6">
         <h3 className="text-sm font-semibold tracking-tight text-ink">{t('options_privacy_models_header')}</h3>
-        <p className="mt-0.5 text-sm text-ink-soft">
-          {t('options_privacy_models_desc', String(sessionsRead))}
-        </p>
+        <p className="mt-0.5 text-sm text-ink-soft">{t('options_privacy_models_desc', String(sessionsRead))}</p>
         {aggregates.length === 0 ? (
           <p className="mt-3 text-sm text-ink-faint">{t('options_privacy_models_empty')}</p>
         ) : (

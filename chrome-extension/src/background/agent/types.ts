@@ -81,6 +81,13 @@ export class AgentContext {
   paused: boolean;
   stopped: boolean;
   consecutiveFailures: number;
+  /**
+   * Consecutive steps that changed nothing on the page, as judged by {@link StallTracker}.
+   *
+   * Separate from `consecutiveFailures`, which counts errors: a stalled run is one where every
+   * action succeeded. Non-zero is what escalates the next read to a screenshot.
+   */
+  stalledSteps: number;
   nSteps: number;
   stepInfo: AgentStepInfo | null;
   actionResults: ActionResult[];
@@ -127,6 +134,7 @@ export class AgentContext {
     this.stopped = false;
     this.nSteps = 0;
     this.consecutiveFailures = 0;
+    this.stalledSteps = 0;
     this.stepInfo = null;
     this.actionResults = [];
     this.stepState = null;
@@ -170,6 +178,7 @@ export class AgentContext {
     this.stopped = false;
     this.paused = false;
     this.consecutiveFailures = 0;
+    this.stalledSteps = 0;
     this.stateMessageAdded = false;
     this.stepState = null;
     this.nSteps = 0;

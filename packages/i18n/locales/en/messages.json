@@ -423,6 +423,12 @@
   "options_sched_enable": {
     "message": "Enabled"
   },
+  "options_sched_watch": {
+    "message": "Only tell me when it changes"
+  },
+  "options_sched_watch_desc": {
+    "message": "notifies only when the collected rows differ from the previous run"
+  },
   "options_sched_delete": {
     "message": "Delete"
   },
@@ -972,6 +978,45 @@
       }
     }
   },
+  "bg_watch_changed_title": {
+    "message": "$TITLE$: something changed",
+    "placeholders": {
+      "title": {
+        "content": "$1",
+        "example": "Price watch"
+      }
+    }
+  },
+  "bg_watch_changed_body": {
+    "message": "$SUMMARY$ since the last run. Open Flowkite to see the table.",
+    "placeholders": {
+      "summary": {
+        "content": "$1",
+        "example": "2 new, 1 changed"
+      }
+    }
+  },
+  "bg_watch_first_body": {
+    "message": "First run of this watch: $COUNT$ rows recorded as the baseline.",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "12"
+      }
+    }
+  },
+  "bg_watch_notTabular_title": {
+    "message": "$TITLE$: nothing to compare",
+    "placeholders": {
+      "title": {
+        "content": "$1",
+        "example": "Price watch"
+      }
+    }
+  },
+  "bg_watch_notTabular_body": {
+    "message": "This run collected no table, so there is nothing to watch for changes in. Ask the task to collect the results as a list."
+  },
   "bg_sched_fail_title": {
     "message": "Failed: $TITLE$",
     "placeholders": {
@@ -1326,6 +1371,21 @@
         "example": "pilih yang termurah"
       }
     }
+  },
+  "exec_stall_nudge": {
+    "message": "Your last $STEPS$ actions all reported success but the page has not changed at all - same URL, same elements, same scroll position. Whatever you are clicking is not doing anything. Do NOT repeat it. Look at the screenshot, and either interact with a different element, navigate somewhere else, or use ask_user if only the user can get past this.",
+    "placeholders": {
+      "steps": {
+        "content": "$1",
+        "example": "3"
+      }
+    }
+  },
+  "exec_stall_notice": {
+    "message": "Nothing on the page has changed for several steps; trying a different approach"
+  },
+  "exec_stall_abort": {
+    "message": "Stopped: the page has not changed for several steps, so the task cannot make progress this way."
   },
   "bg_cmd_steer_notRunning": {
     "message": "Steering is only possible while a task is running."
