@@ -35,6 +35,8 @@ interface TaskDispatchProps {
   taskRunning: boolean;
   /** mirrors currentSessionId, so a session created mid-handler is visible before re-render */
   sessionIdRef: MutableRefObject<string | null>;
+  /** the taskId of the run this panel launched; what event routing and outcome writes key on */
+  activeTaskIdRef: MutableRefObject<string | null>;
   setMessages: Dispatch<SetStateAction<Message[]>>;
   setCurrentSessionId: Dispatch<SetStateAction<string | null>>;
   setInputEnabled: Dispatch<SetStateAction<boolean>>;
@@ -76,6 +78,7 @@ export const useTaskDispatch = ({
   isFollowUpMode,
   taskRunning,
   sessionIdRef,
+  activeTaskIdRef,
   setMessages,
   setCurrentSessionId,
   setInputEnabled,
@@ -131,6 +134,7 @@ export const useTaskDispatch = ({
       const newTaskId = newSession.id;
       setCurrentSessionId(newTaskId);
       sessionIdRef.current = newTaskId;
+      activeTaskIdRef.current = newTaskId;
 
       // Send replay command to background
       setInputEnabled(false);
@@ -154,8 +158,9 @@ export const useTaskDispatch = ({
         setupConnection();
       }
 
-      // Send replay command to background with the task from history
-      portRef.current?.postMessage({
+      // Send replay command to background with the task from history. Not optional-chained: a
+      // dropped port must land in the catch below, not silently show a replay that never started.
+      postToBackground(portRef.current, {
         type: 'replay',
         taskId: newTaskId,
         tabId: tabId,
@@ -173,6 +178,11 @@ export const useTaskDispatch = ({
         content: t('chat_replay_failed', errorMessage),
         timestamp: Date.now(),
       });
+      // the replay never started, so the panel must not keep looking like it did
+      setInputEnabled(true);
+      setShowStopButton(false);
+      setIsReplaying(false);
+      setLiveStatus(null);
     }
   };
 
@@ -186,16 +196,12 @@ export const useTaskDispatch = ({
 
       // Handle different commands
       if (command === '/state') {
-        portRef.current?.postMessage({
-          type: 'state',
-        });
+        postToBackground(portRef.current, { type: 'state' });
         return true;
       }
 
       if (command === '/nohighlight') {
-        portRef.current?.postMessage({
-          type: 'nohighlight',
-        });
+        postToBackground(portRef.current, { type: 'nohighlight' });
         return true;
       }
 
@@ -236,17 +242,21 @@ export const useTaskDispatch = ({
     }
   };
 
-  const handleSendMessage = async (text: string, displayText?: string) => {
+  /**
+   * @returns whether the text was accepted - false means the composer should keep the draft,
+   * because nothing was sent and nothing consumed it.
+   */
+  const handleSendMessage = async (text: string, displayText?: string): Promise<boolean> => {
     // Trim the input text first
     const trimmedText = text.trim();
 
-    if (!trimmedText) return;
+    if (!trimmedText) return false;
 
     // Check if the input is a command (starts with /)
     if (trimmedText.startsWith('/')) {
       // Process command and return if it was handled
       const wasHandled = await handleCommand(trimmedText);
-      if (wasHandled) return;
+      if (wasHandled) return true;
     }
 
     // A stored chat on screen while another task runs live: a send here can neither steer that
@@ -254,7 +264,7 @@ export const useTaskDispatch = ({
     // Shown, not persisted - the notice is about this moment, not part of the stored conversation.
     if (isHistoricalSession && taskRunning) {
       appendMessage({ actor: Actors.SYSTEM, content: t('chat_history_taskStillRunning'), timestamp: Date.now() }, null);
-      return;
+      return false;
     }
 
     // A send while the agent is working is a correction, not a new task. It keeps everything the
@@ -269,8 +279,9 @@ export const useTaskDispatch = ({
           content: err instanceof Error ? err.message : String(err),
           timestamp: Date.now(),
         });
+        return false;
       }
-      return;
+      return true;
     }
 
     try {
@@ -301,6 +312,10 @@ export const useTaskDispatch = ({
         setCurrentSessionId(sessionId);
         sessionIdRef.current = sessionId;
       }
+
+      // Whatever session this send resolved to is the task the panel now owns: event routing and
+      // the outcome write both key on it, even if the user wanders off to read another session.
+      activeTaskIdRef.current = sessionIdRef.current;
 
       const userMessage = {
         actor: Actors.USER,
@@ -336,6 +351,7 @@ export const useTaskDispatch = ({
           approvalMode,
         });
       }
+      return true;
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : String(err);
       console.error('Task error', errorMessage);
@@ -347,6 +363,7 @@ export const useTaskDispatch = ({
       setInputEnabled(true);
       setShowStopButton(false);
       stopConnection();
+      return false;
     }
   };
 
@@ -386,7 +403,10 @@ export const useTaskDispatch = ({
         content: errorMessage,
         timestamp: Date.now(),
       });
+      // The answer never reached the worker, so no event will ever arrive to clear these. Leaving
+      // showStopButton up turned every later send into a steer at a task that does not exist.
       setInputEnabled(true);
+      setShowStopButton(false);
     }
   };
 
@@ -415,7 +435,9 @@ export const useTaskDispatch = ({
       const errorMessage = err instanceof Error ? err.message : String(err);
       console.error('action confirmation error', errorMessage);
       appendMessage({ actor: Actors.SYSTEM, content: errorMessage, timestamp: Date.now() });
+      // same as the plan-review catch: nothing will arrive over the dead port to clear these
       setInputEnabled(true);
+      setShowStopButton(false);
     }
   };
 

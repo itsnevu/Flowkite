@@ -216,6 +216,12 @@ export class AgentContext {
       await this.emitEvent(Actors.NAVIGATOR, ExecutionState.ACT_DECLINED, request.description, request);
       return false;
     }
+    // A cancel can land between the navigator deciding to ask and this gate arming. cancel()
+    // releases the resolvers that exist at that moment; a gate created after it would park a run
+    // that is already stopped, forever. Declining is the answer a stop means.
+    if (this.stopped) {
+      return false;
+    }
     await this.emitEvent(Actors.NAVIGATOR, ExecutionState.ACT_CONFIRM, request.description, request);
     const approved = await new Promise<boolean>(resolve => {
       this.actionConfirmationResolver = resolve;
@@ -245,6 +251,11 @@ export class AgentContext {
     // Unattended: there is nobody to hand the tab to. Fail the request rather than park forever;
     // the ask_user action emits the decline event, so none is emitted here.
     if (this.options.unattended) {
+      return false;
+    }
+    // Same race as the confirmation gate: a handoff requested after a cancel must not park a run
+    // that is already stopped.
+    if (this.stopped) {
       return false;
     }
     await this.emitEvent(Actors.NAVIGATOR, ExecutionState.ACT_HANDOFF, request.instruction, request);

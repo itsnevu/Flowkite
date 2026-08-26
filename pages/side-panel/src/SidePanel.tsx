@@ -61,7 +61,15 @@ const SidePanel = () => {
   const [liveStatus, setLiveStatus] = useState<LiveStatus | null>(null);
   const [trail, setTrail] = useState<TrailStep[]>([]);
   const sessionIdRef = useRef<string | null>(null);
+  /**
+   * The taskId (= session id) of the run this panel launched. Distinct from sessionIdRef on
+   * purpose: sessionIdRef follows whatever session is on screen, and a task must keep writing to
+   * its own session while the user reads a different one.
+   */
+  const activeTaskIdRef = useRef<string | null>(null);
   const isReplayingRef = useRef<boolean>(false);
+  /** mirrors showStopButton for callbacks captured once by the port listener */
+  const taskRunningRef = useRef<boolean>(false);
   /**
    * The trail is held as a ref as well as state. The event handler is captured once by the port
    * listener, so it can never read the state copy - it would read whatever the trail was when the
@@ -93,11 +101,20 @@ const SidePanel = () => {
     isReplayingRef.current = isReplaying;
   }, [isReplaying]);
 
-  const appendMessage = useCallback((newMessage: Message, sessionId?: string | null) => {
-    setMessages(prev => [...prev, newMessage]);
+  useEffect(() => {
+    taskRunningRef.current = showStopButton;
+  }, [showStopButton]);
 
+  const appendMessage = useCallback((newMessage: Message, sessionId?: string | null) => {
     // Use provided sessionId if available, otherwise fall back to sessionIdRef.current
     const effectiveSessionId = sessionId !== undefined ? sessionId : sessionIdRef.current;
+
+    // Shown only in the transcript it belongs to: a task can finish while the user is reading a
+    // different session, and its message must not appear spliced into that one. (null means an
+    // unpersisted notice about this moment, which always belongs on screen.)
+    if (!effectiveSessionId || effectiveSessionId === sessionIdRef.current) {
+      setMessages(prev => [...prev, newMessage]);
+    }
 
     // Save message to storage if we have a session
     if (effectiveSessionId) {
@@ -131,13 +148,17 @@ const SidePanel = () => {
     (message: Message) => {
       const steps = trailRef.current.slice(-200);
       const dataset = datasetRef.current;
-      appendMessage({
-        ...message,
-        ...(steps.length > 0 ? { steps } : {}),
-        // Uncapped, unlike the trail: these rows are the result the user asked for, not a record of
-        // how it was reached, and the collector already bounds them.
-        ...(dataset && dataset.rows.length > 0 ? { dataset } : {}),
-      });
+      appendMessage(
+        {
+          ...message,
+          ...(steps.length > 0 ? { steps } : {}),
+          // Uncapped, unlike the trail: these rows are the result the user asked for, not a record
+          // of how it was reached, and the collector already bounds them.
+          ...(dataset && dataset.rows.length > 0 ? { dataset } : {}),
+        },
+        // The task's own session, explicitly - never whichever session the user is reading now.
+        activeTaskIdRef.current ?? sessionIdRef.current,
+      );
       setLiveStatus(null);
     },
     [appendMessage],
@@ -149,7 +170,12 @@ const SidePanel = () => {
    */
   const handleConnectionLost = useCallback(() => {
     setLiveStatus(null);
-    if (taskSettledRef.current || trailRef.current.length === 0) return;
+    // A dropped worker also ends any replay; without this the flag stays latched and silences
+    // every later task's chime.
+    setIsReplaying(false);
+    // "Was a task running?" - not "did it leave trail entries?": a worker that dies during the
+    // first planner call has produced no trail at all, and that task still deserves a record.
+    if (taskSettledRef.current || !taskRunningRef.current) return;
     taskSettledRef.current = true;
     finalizeTask({ actor: Actors.SYSTEM, content: t('chat_task_interrupted'), timestamp: Date.now() });
   }, [finalizeTask]);
@@ -162,6 +188,7 @@ const SidePanel = () => {
     captureDataset,
     taskSettledRef,
     isReplayingRef,
+    activeTaskIdRef,
     setCanUndo,
     setTokenUsage,
     setIsHistoricalSession,
@@ -215,6 +242,7 @@ const SidePanel = () => {
       isFollowUpMode,
       taskRunning: showStopButton,
       sessionIdRef,
+      activeTaskIdRef,
       setMessages,
       setCurrentSessionId,
       setInputEnabled,
@@ -254,7 +282,10 @@ const SidePanel = () => {
             content: err instanceof Error ? err.message : t('errors_conn_serviceWorker'),
             timestamp: Date.now(),
           });
+          // nothing will arrive over the dead port to clear these; a standing Stop button would
+          // turn every later send into a steer at a task that does not exist
           setInputEnabled(true);
+          setShowStopButton(false);
         }
       } else {
         void handleStopTask();
@@ -275,7 +306,9 @@ const SidePanel = () => {
             content: err instanceof Error ? err.message : t('errors_conn_serviceWorker'),
             timestamp: Date.now(),
           });
+          // same as the handoff catch above
           setInputEnabled(true);
+          setShowStopButton(false);
         }
       } else {
         void handleStopTask();
@@ -312,8 +345,12 @@ const SidePanel = () => {
     setMessages([]);
     setCurrentSessionId(null);
     sessionIdRef.current = null;
+    // stopConnection below ends whatever ran; a dead task must not keep owning event routing
+    activeTaskIdRef.current = null;
     setInputEnabled(true);
     setShowStopButton(false);
+    // the escape hatch clears this too, or a replay that lost its worker mutes chimes forever
+    setIsReplaying(false);
     setIsFollowUpMode(false);
     setIsHistoricalSession(false);
     setPendingPlan(null);
@@ -334,15 +371,9 @@ const SidePanel = () => {
     stopConnection();
   };
 
-  // Persist the running total so reopening this session later still shows what it cost. Kept here
-  // rather than in the event handler: the snapshot is cumulative and idempotent, so writing the
-  // latest value is always correct and a dropped event costs freshness, never accuracy.
-  useEffect(() => {
-    if (!tokenUsage || !currentSessionId) return;
-    chatHistoryStore
-      .storeTokenUsage(currentSessionId, tokenUsage)
-      .catch(err => console.error('Failed to save token usage:', err));
-  }, [tokenUsage, currentSessionId]);
+  // The running total is persisted from the TASK_USAGE event handler, keyed by the event's own
+  // taskId. It used to be an effect on [tokenUsage, currentSessionId] here - which wrote the
+  // running task's spend onto whatever session the user happened to open from history.
 
   const loadChatSessions = useCallback(async () => {
     try {
@@ -371,17 +402,23 @@ const SidePanel = () => {
   const handleSessionSelect = async (sessionId: string) => {
     try {
       const fullSession = await chatHistoryStore.getSession(sessionId);
-      if (fullSession && fullSession.messages.length > 0) {
+      // An empty session still loads: silently bouncing back to the previous transcript left the
+      // user typing into a conversation they thought they had left.
+      if (fullSession) {
         setCurrentSessionId(fullSession.id);
         setMessages(fullSession.messages);
         setIsFollowUpMode(false);
         setIsHistoricalSession(true); // Mark this as a historical session
         // show what THIS session spent, not whatever the last live task happened to leave on screen
         setTokenUsage(await chatHistoryStore.loadTokenUsage(sessionId));
-        // whatever the previous task was doing is not what this stored session shows
-        setLiveStatus(null);
-        resetTrail();
-        taskSettledRef.current = false;
+        if (!showStopButton) {
+          // Only when nothing is running: a live task owns the status line, the trail and the
+          // settled latch, and browsing history must not wipe them mid-run (re-arming the latch
+          // let a rejected plan's two terminal events both write a message).
+          setLiveStatus(null);
+          resetTrail();
+          taskSettledRef.current = false;
+        }
       }
       setShowHistory(false);
     } catch (error) {

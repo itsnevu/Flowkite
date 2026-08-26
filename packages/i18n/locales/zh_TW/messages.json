@@ -1399,6 +1399,9 @@
   "bg_task_tabClosed": {
     "message": "這項任務所在的分頁已被關閉，任務已停止。"
   },
+  "bg_cmd_task_busy": {
+    "message": "另一項任務仍在執行。請等待它完成，或先停止它。"
+  },
   "chat_buttons_steer": {
     "message": "傳送修正"
   },

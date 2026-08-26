@@ -1399,6 +1399,9 @@
   "bg_task_tabClosed": {
     "message": "A aba em que esta tarefa trabalhava foi fechada, então a tarefa parou."
   },
+  "bg_cmd_task_busy": {
+    "message": "Outra tarefa ainda está em execução. Aguarde ela terminar, ou pare-a primeiro."
+  },
   "chat_buttons_steer": {
     "message": "Enviar correção"
   },

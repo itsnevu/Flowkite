@@ -479,13 +479,20 @@ export class Executor {
       if (import.meta.env.DEV) {
         logger.debug('Executor history', JSON.stringify(this.context.history, null, 2));
       }
-      // store the history only if replay is enabled
-      if (this.generalSettings?.replayHistoricalTasks) {
-        const historyString = JSON.stringify(this.context.history);
-        logger.info(`Executor history size: ${historyString.length}`);
-        await chatHistoryStore.storeAgentStepHistory(this.context.taskId, this.tasks[0], historyString);
+      // Store the history only if replay is enabled - and never for unattended runs, whose taskId
+      // has no chat session behind it: storeAgentStepHistory throws "session not found" for them,
+      // and a throw out of this finally replaced the run's real outcome with that error.
+      if (this.generalSettings?.replayHistoricalTasks && !this.context.options.unattended) {
+        try {
+          const historyString = JSON.stringify(this.context.history);
+          logger.info(`Executor history size: ${historyString.length}`);
+          await chatHistoryStore.storeAgentStepHistory(this.context.taskId, this.tasks[0], historyString);
+        } catch (error) {
+          // replay data is an extra, never worth overwriting how the task actually ended
+          logger.error('Failed to store the replay history:', error);
+        }
       } else {
-        logger.info('Replay historical tasks is disabled, skipping history storage');
+        logger.info('Replay history storage skipped (disabled or unattended run)');
       }
     }
   }
@@ -835,8 +842,12 @@ export class Executor {
 
   async cancel(reason?: string): Promise<void> {
     this.cancelReason = reason ?? null;
-    // release the plan-approval gate first, otherwise execute() stays blocked on it forever
+    // Release every gate the run can be parked on, otherwise execute() stays blocked forever:
+    // the user who pressed Stop while a plan, confirmation or handoff card was up has already
+    // lost the card, so nothing else could ever answer these.
     this.planApprovalResolver?.(false);
+    this.context.resolveActionConfirmation(false);
+    this.context.resolveHandoff(false);
     this.context.stop();
   }
 

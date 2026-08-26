@@ -22,43 +22,86 @@ const chatSessionsMetaStorage = createStorage<ChatSessionMetadata[]>(CHAT_SESSIO
 // Helper function to get storage key for a specific session's messages
 const getSessionMessagesKey = (sessionId: string) => `chat_messages_${sessionId}`;
 
-// Helper function to create storage for a specific session's messages
-const getSessionMessagesStorage = (sessionId: string) => {
-  return createStorage<ChatMessage[]>(getSessionMessagesKey(sessionId), [], {
-    storageEnum: StorageEnum.Local,
-    liveUpdate: true,
-  });
+/**
+ * One storage instance per session key, reused for the life of this JS context.
+ *
+ * `createStorage` with `liveUpdate` registers a permanent `chrome.storage.onChanged` listener per
+ * instance and there is no dispose - so building a fresh instance per operation, as this file used
+ * to, leaked a listener (plus a cached copy of the value) on every single message write. A long
+ * task accumulated hundreds, each dispatched on every storage change. Reuse also closes a write
+ * race: two fresh instances for the same key could prime their caches on either side of each
+ * other's write and silently drop a message; one instance per key serializes through one cache.
+ */
+const sessionStorageCache = new Map<string, unknown>();
+
+const cached = <T>(key: string, build: () => T): T => {
+  let storage = sessionStorageCache.get(key) as T | undefined;
+  if (!storage) {
+    storage = build();
+    sessionStorageCache.set(key, storage);
+  }
+  return storage;
 };
+
+const getSessionMessagesStorage = (sessionId: string) =>
+  cached(getSessionMessagesKey(sessionId), () =>
+    createStorage<ChatMessage[]>(getSessionMessagesKey(sessionId), [], {
+      storageEnum: StorageEnum.Local,
+      liveUpdate: true,
+    }),
+  );
 
 // Helper function to get storage key for a specific session's token usage
 const getSessionTokenUsageKey = (sessionId: string) => `chat_usage_${sessionId}`;
 
 // Token usage is stored per session rather than on the metadata record, so listing sessions in the
 // history panel does not have to read every session's spend.
-const getSessionTokenUsageStorage = (sessionId: string) => {
-  return createStorage<ChatTokenUsage | null>(getSessionTokenUsageKey(sessionId), null, {
-    storageEnum: StorageEnum.Local,
-    liveUpdate: true,
-  });
-};
+const getSessionTokenUsageStorage = (sessionId: string) =>
+  cached(getSessionTokenUsageKey(sessionId), () =>
+    createStorage<ChatTokenUsage | null>(getSessionTokenUsageKey(sessionId), null, {
+      storageEnum: StorageEnum.Local,
+      liveUpdate: true,
+    }),
+  );
 
 // Helper function to get storage key for a specific session's agent state history
 const getSessionAgentStepHistoryKey = (sessionId: string) => `chat_agent_step_${sessionId}`;
 
 // Helper function to get storage for a specific session's agent state history
-const getSessionAgentStepHistoryStorage = (sessionId: string) => {
-  return createStorage<ChatAgentStepHistory>(
-    getSessionAgentStepHistoryKey(sessionId),
-    {
-      task: '',
-      history: '',
-      timestamp: 0,
-    },
-    {
-      storageEnum: StorageEnum.Local,
-      liveUpdate: true,
-    },
+const getSessionAgentStepHistoryStorage = (sessionId: string) =>
+  cached(getSessionAgentStepHistoryKey(sessionId), () =>
+    createStorage<ChatAgentStepHistory>(
+      getSessionAgentStepHistoryKey(sessionId),
+      {
+        task: '',
+        history: '',
+        timestamp: 0,
+      },
+      {
+        storageEnum: StorageEnum.Local,
+        liveUpdate: true,
+      },
+    ),
   );
+
+/**
+ * Physically remove a session's satellite keys.
+ *
+ * Writing empties, as deletion used to, left one orphan key per deleted session in
+ * chrome.storage.local forever. The cache entries go too - their instances hold the dead value.
+ * (Their onChanged listeners are unremovable, but that cost is one per deleted session, not one
+ * per write.)
+ */
+const removeSessionKeys = async (sessionId: string): Promise<void> => {
+  const keys = [
+    getSessionMessagesKey(sessionId),
+    getSessionTokenUsageKey(sessionId),
+    getSessionAgentStepHistoryKey(sessionId),
+  ];
+  for (const key of keys) {
+    sessionStorageCache.delete(key);
+  }
+  await globalThis.chrome?.storage?.local?.remove(keys);
 };
 
 // Helper function to get current timestamp in milliseconds
@@ -83,10 +126,7 @@ export function createChatHistoryStorage(): ChatHistoryStorage {
     clearAllSessions: async (): Promise<void> => {
       const sessionsMeta = await chatSessionsMetaStorage.get();
       for (const sessionMeta of sessionsMeta) {
-        const messagesStorage = getSessionMessagesStorage(sessionMeta.id);
-        await messagesStorage.set([]);
-        await getSessionAgentStepHistoryStorage(sessionMeta.id).set({ task: '', history: '', timestamp: 0 });
-        await getSessionTokenUsageStorage(sessionMeta.id).set(null);
+        await removeSessionKeys(sessionMeta.id);
       }
       await chatSessionsMetaStorage.set([]);
     },
@@ -178,14 +218,9 @@ export function createChatHistoryStorage(): ChatHistoryStorage {
       // Remove session from metadata
       await chatSessionsMetaStorage.set(prevSessions => prevSessions.filter(session => session.id !== sessionId));
 
-      // Remove the session's messages
-      const messagesStorage = getSessionMessagesStorage(sessionId);
-      await messagesStorage.set([]);
-
-      // ...and everything else keyed by the session id. Without this the step history and the token
-      // totals outlive the session that owned them, invisible to the user and impossible to reach.
-      await getSessionAgentStepHistoryStorage(sessionId).set({ task: '', history: '', timestamp: 0 });
-      await getSessionTokenUsageStorage(sessionId).set(null);
+      // ...and everything keyed by the session id, physically. Written-empty keys outlived the
+      // session forever; removed keys do not.
+      await removeSessionKeys(sessionId);
     },
 
     addMessage: async (sessionId: string, message: Message): Promise<ChatMessage> => {

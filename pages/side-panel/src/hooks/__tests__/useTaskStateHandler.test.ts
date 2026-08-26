@@ -74,8 +74,10 @@ function setup() {
   };
   const isReplayingRef = { current: false };
   const taskSettledRef = { current: false };
-  const handle = useTaskStateHandler({ ...spies, isReplayingRef, taskSettledRef });
-  return { handle, appendMessage, trail, isReplayingRef, taskSettledRef, ...spies };
+  // the panel launched TASK_ID, so the fixtures' events are its own and pass the foreign filter
+  const activeTaskIdRef = { current: TASK_ID as string | null };
+  const handle = useTaskStateHandler({ ...spies, isReplayingRef, taskSettledRef, activeTaskIdRef });
+  return { handle, appendMessage, trail, isReplayingRef, taskSettledRef, activeTaskIdRef, ...spies };
 }
 
 function event(actor: Actors, state: ExecutionState, details = 'detail text', payload?: EventPayload) {
@@ -149,6 +151,26 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.restoreAllMocks();
+});
+
+describe('foreign tasks', () => {
+  it('drops every event of a task this panel did not launch', () => {
+    const s = setup();
+    s.activeTaskIdRef.current = 'some-other-session';
+    s.handle(event(Actors.SYSTEM, ExecutionState.TASK_START));
+    s.handle(event(Actors.SYSTEM, ExecutionState.TASK_OK, 'a stranger finished'));
+    expect(s.appendMessage).not.toHaveBeenCalled();
+    expect(s.setLiveStatus).not.toHaveBeenCalled();
+    expect(s.setTokenUsage).not.toHaveBeenCalled();
+    expect(s.setInputEnabled).not.toHaveBeenCalled();
+  });
+
+  it('drops a scheduled run outright, even when the panel launched nothing', () => {
+    const s = setup();
+    s.activeTaskIdRef.current = null;
+    s.handle(event(Actors.SYSTEM, ExecutionState.TASK_OK, 'unattended answer'));
+    expect(s.appendMessage).not.toHaveBeenCalled();
+  });
 });
 
 describe('coverage of the emitted event surface', () => {
@@ -831,7 +853,9 @@ describe('message shape', () => {
   // `content` is a required string on Message; an undefined would break rendering downstream.
   it('substitutes an empty string when a terminal event carries no detail', () => {
     const { handle, finalizeTask } = setup();
-    handle(new AgentEvent(Actors.SYSTEM, ExecutionState.TASK_CANCEL, { taskId: 't', step: 1, maxSteps: 10 } as never));
+    handle(
+      new AgentEvent(Actors.SYSTEM, ExecutionState.TASK_CANCEL, { taskId: TASK_ID, step: 1, maxSteps: 10 } as never),
+    );
     expect(finalizeTask.mock.calls[0][0].content).toBe('');
   });
 

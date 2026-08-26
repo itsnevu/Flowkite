@@ -9,7 +9,8 @@ import type { ApprovalMode } from '@extension/storage';
 import type { PlaceholderSpan } from '../templates';
 
 interface ChatInputProps {
-  onSendMessage: (text: string, displayText?: string) => void;
+  /** false (sync or async) means the text was refused and the composer must keep the draft */
+  onSendMessage: (text: string, displayText?: string) => void | boolean | Promise<void | boolean>;
   onStopTask: () => void;
   onMicClick?: () => void;
   isRecording?: boolean;
@@ -182,9 +183,13 @@ export default function ChatInput({
 
         // Written before the task is sent, so the action can never race the panel and find the
         // store still empty. Replaces rather than appends: these belong to the task being sent.
-        void uploadsStore.setFiles(
-          uploadFiles.map(file => ({ name: file.name, mimeType: file.type, data: file.content, size: file.size })),
-        );
+        // Skipped for an attachment-less send while a task runs - that is a steering correction,
+        // and wiping the store there took away the very file the running task was about to upload.
+        if (uploadFiles.length > 0 || !showStopButton) {
+          void uploadsStore.setFiles(
+            uploadFiles.map(file => ({ name: file.name, mimeType: file.type, data: file.content, size: file.size })),
+          );
+        }
 
         if (textFiles.length > 0) {
           const fileContents = textFiles
@@ -212,13 +217,17 @@ export default function ChatInput({
           displayContent = trimmedText ? `${trimmedText}\n\n${fileList}` : fileList;
         }
 
-        onSendMessage(messageContent, displayContent);
-        setText('');
-        setAttachedFiles([]);
-        setAttachError(null);
+        // The draft is cleared only once the send is accepted: a refusal (a task still running in
+        // a stored chat, a dead connection) must hand the user their text back, not eat it.
+        void Promise.resolve(onSendMessage(messageContent, displayContent)).then(accepted => {
+          if (accepted === false) return;
+          setText('');
+          setAttachedFiles([]);
+          setAttachError(null);
+        });
       }
     },
-    [text, placeholders, selectSpan, attachedFiles, onSendMessage],
+    [text, placeholders, selectSpan, attachedFiles, onSendMessage, showStopButton],
   );
 
   const handleKeyDown = useCallback(
@@ -387,8 +396,9 @@ export default function ChatInput({
           )}
 
           {/* A stored chat accepts new prompts, but the agent starts without the old run's context
-              - said here, before the user types, rather than discovered mid-task. */}
-          {isHistoricalSession && (
+              - said here, before the user types, rather than discovered mid-task. Hidden while a
+              task runs: a send then is refused with its own explanation, not a continuation. */}
+          {isHistoricalSession && !showStopButton && (
             <p className="px-1.5 text-[10px] leading-tight text-ink-faint" role="note">
               {t('chat_history_continueNote')}
             </p>

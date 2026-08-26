@@ -10,9 +10,24 @@ describe('compareRuns', () => {
     expect(result).toMatchObject({ changed: true, added: 1, reason: 'no-previous' });
   });
 
-  it('says a run with no rows cannot be compared, instead of guessing', () => {
-    expect(compareRuns(table([['Kite', '10']]), undefined)).toMatchObject({ changed: true, reason: 'not-tabular' });
-    expect(compareRuns(table([['Kite', '10']]), table([]))).toMatchObject({ changed: true, reason: 'not-tabular' });
+  it('reports a run that lost every row as removals, not as something that cannot be compared', () => {
+    expect(compareRuns(table([['Kite', '10']]), undefined)).toMatchObject({ changed: true, added: 0, removed: 1 });
+    expect(compareRuns(table([['Kite', '10']]), table([]))).toMatchObject({ changed: true, added: 0, removed: 1 });
+  });
+
+  it('stays silent when two runs in a row found nothing', () => {
+    expect(compareRuns(table([]), table([]))).toMatchObject({ changed: false });
+    expect(compareRuns(table([]), undefined)).toMatchObject({ changed: false });
+  });
+
+  it('says a run with no rows and no baseline at all cannot be compared', () => {
+    expect(compareRuns(undefined, undefined)).toMatchObject({ changed: true, reason: 'not-tabular' });
+  });
+
+  it('treats an empty baseline as real: every current row reads as added, not as a first run', () => {
+    const result = compareRuns(table([]), table([['Kite', '10']]));
+    expect(result).toMatchObject({ changed: true, added: 1, removed: 0 });
+    expect(result.reason).toBeUndefined();
   });
 
   it('is silent when the rows are identical', () => {

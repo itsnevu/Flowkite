@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { Actors, feedbackPromptStore } from '@extension/storage';
+import { Actors, chatHistoryStore, feedbackPromptStore } from '@extension/storage';
 import { t } from '@extension/i18n';
 import { ExecutionState } from '../types/event';
 import { playTaskChime } from '../chime';
@@ -28,6 +28,12 @@ interface TaskStateHandlerProps {
   taskSettledRef: MutableRefObject<boolean>;
   /** read, never written, so the handler can stay stable while replay state changes */
   isReplayingRef: MutableRefObject<boolean>;
+  /**
+   * The taskId (= session id) of the run this panel launched, or null when it launched none.
+   * Events carry their own taskId; anything that does not match - a scheduled run, a task an
+   * earlier panel started - must not touch this panel's state or storage.
+   */
+  activeTaskIdRef: MutableRefObject<string | null>;
   setCanUndo: Dispatch<SetStateAction<boolean>>;
   setTokenUsage: Dispatch<SetStateAction<TokenUsagePayload | null>>;
   setIsHistoricalSession: Dispatch<SetStateAction<boolean>>;
@@ -68,6 +74,7 @@ export const useTaskStateHandler = ({
   captureDataset,
   taskSettledRef,
   isReplayingRef,
+  activeTaskIdRef,
   setCanUndo,
   setTokenUsage,
   setIsHistoricalSession,
@@ -84,6 +91,13 @@ export const useTaskStateHandler = ({
     (event: AgentEvent) => {
       const { actor, state, timestamp, data } = event;
       const content = data?.details;
+      // The port forwards every run's events, not just ours: a scheduled run, or a task started by
+      // a panel in another window. Applying those here would splice a stranger's outcome, spend and
+      // status into whatever session this panel happens to have open - so anything this panel did
+      // not launch is dropped whole. The background persists those runs' outcomes itself.
+      if (typeof data?.taskId === 'string' && data.taskId !== activeTaskIdRef.current) {
+        return;
+      }
       // any step that reached the browser is a step the user may want to roll back
       if (state === ExecutionState.ACT_OK) {
         setCanUndo(true);
@@ -91,7 +105,14 @@ export const useTaskStateHandler = ({
       // Handled before the actor switch, whose default arm would log it as an invalid state. The
       // early return also keeps this per-call telemetry out of the persisted chat history.
       if (state === ExecutionState.TASK_USAGE) {
-        setTokenUsage((data?.payload as TokenUsagePayload) ?? null);
+        const usage = (data?.payload as TokenUsagePayload) ?? null;
+        setTokenUsage(usage);
+        // Persisted here, keyed by the event's own taskId, rather than from a SidePanel effect
+        // keyed by the session on screen: the user may be reading an old session while this task
+        // spends, and its numbers must never overwrite that session's stored spend.
+        if (usage && typeof data?.taskId === 'string') {
+          void chatHistoryStore.storeTokenUsage(data.taskId, usage).catch(() => undefined);
+        }
         return;
       }
       // Also handled before the actor switch, and for the same reason. It is not an outcome either:
@@ -344,6 +365,7 @@ export const useTaskStateHandler = ({
       captureDataset,
       taskSettledRef,
       isReplayingRef,
+      activeTaskIdRef,
       setCanUndo,
       setTokenUsage,
       setIsHistoricalSession,

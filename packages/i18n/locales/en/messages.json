@@ -1399,6 +1399,9 @@
   "bg_task_tabClosed": {
     "message": "The tab this task was working in was closed, so the task stopped."
   },
+  "bg_cmd_task_busy": {
+    "message": "Another task is still running. Wait for it to finish, or stop it first."
+  },
   "chat_buttons_steer": {
     "message": "Send correction"
   },

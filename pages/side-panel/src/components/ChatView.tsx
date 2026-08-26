@@ -47,7 +47,7 @@ interface ChatViewProps {
   tokenUsage: TokenUsagePayload | null;
   messagesEndRef: RefObject<HTMLDivElement>;
   onSetInputText: (setter: (text: string) => void) => void;
-  onSendMessage: (text: string, displayText?: string) => void;
+  onSendMessage: (text: string, displayText?: string) => void | boolean | Promise<void | boolean>;
   onStopTask: () => void;
   onMicClick: () => void;
   onReplay: (sessionId: string) => void;

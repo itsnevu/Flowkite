@@ -43,19 +43,34 @@ let currentPort: chrome.runtime.Port | null = null;
 const SIDE_PANEL_URL = chrome.runtime.getURL('side-panel/index.html');
 
 /**
- * True while any run (panel-started or scheduled) is inside its execute loop. The scheduler reads
- * it to skip a firing rather than fight the user's live task for the one shared BrowserContext.
+ * True while any run (panel-started, scheduled, webhook or replay) holds the single run slot.
+ *
+ * The slot is claimed synchronously, before the first await of whichever starter got there first.
+ * The old shape set this flag deep inside the run, after several awaits of setup - so two alarms
+ * firing in the same tick, or a panel task landing during a schedule's setup, both observed "not
+ * busy" and proceeded to fight each other for the one shared BrowserContext.
  */
 let executorBusy = false;
 
-async function withExecutorBusy<T>(run: () => Promise<T>): Promise<T> {
+/** Claim the run slot now, synchronously. False means another run already holds it. */
+function claimRunSlot(): boolean {
+  if (executorBusy) return false;
   executorBusy = true;
-  try {
-    return await run();
-  } finally {
-    executorBusy = false;
-  }
+  return true;
 }
+
+function releaseRunSlot(): void {
+  executorBusy = false;
+}
+
+/**
+ * The taskId of the run the connected panel launched, or null when it has not launched one.
+ *
+ * This is what decides who persists a task's outcome to chat history: the panel writes the task it
+ * launched itself, the background (persistOutcomeWithoutPanel) writes everything else. Reset when a
+ * panel connects, because a new panel knows nothing about a task an earlier panel started.
+ */
+let currentPanelTaskId: string | null = null;
 
 /**
  * What the currently-running task is, for the outbound webhook. One executor runs at a time, so
@@ -252,7 +267,21 @@ chrome.runtime.onConnect.addListener(port => {
       return;
     }
 
+    // One panel at a time. Taking the slot must also tell the panel that held it - disconnecting
+    // it makes that panel show a dropped connection instead of a live-looking transcript that no
+    // longer receives anything. Calling disconnect() here does not fire this context's own
+    // onDisconnect listener, so the handover cannot cancel a running task by accident.
+    if (currentPort && currentPort !== port) {
+      try {
+        currentPort.disconnect();
+      } catch {
+        // it was already gone
+      }
+    }
     currentPort = port;
+    // a new panel has launched nothing yet; without this reset, outcomes of a task an earlier
+    // panel started would be skipped by persistOutcomeWithoutPanel and written by nobody
+    currentPanelTaskId = null;
 
     port.onMessage.addListener(async message => {
       try {
@@ -265,20 +294,30 @@ chrome.runtime.onConnect.addListener(port => {
           case 'new_task': {
             if (!message.task) return port.postMessage({ type: 'error', error: t('bg_cmd_newTask_noTask') });
             if (!message.tabId) return port.postMessage({ type: 'error', error: t('bg_errors_noTabId') });
+            // A scheduled or webhook run may hold the slot; a second executor over the same
+            // BrowserContext would have two agents driving one browser.
+            if (!claimRunSlot()) return port.postMessage({ type: 'error', error: t('bg_cmd_task_busy') });
 
             logger.info('new_task', message.tabId, message.task);
-            currentTaskMeta = { source: 'manual', task: message.task, startedAt: Date.now(), chain: 0 };
-            const executor = await setupExecutor(
-              message.taskId,
-              message.task,
-              browserContext,
-              readApprovalMode(message.approvalMode),
-            );
-            currentExecutor = executor;
-            subscribeToExecutorEvents(executor);
+            try {
+              const executor = await setupExecutor(
+                message.taskId,
+                message.task,
+                browserContext,
+                readApprovalMode(message.approvalMode),
+              );
+              currentExecutor = executor;
+              // After setup, which can throw: a meta written before it would outlive the failed
+              // run and stamp the next terminal event with this task's identity.
+              currentTaskMeta = { source: 'manual', task: message.task, startedAt: Date.now(), chain: 0 };
+              currentPanelTaskId = typeof message.taskId === 'string' ? message.taskId : null;
+              subscribeToExecutorEvents(executor);
 
-            const result = await withExecutorBusy(() => executor.execute());
-            logger.info('new_task execution result', message.tabId, result);
+              const result = await executor.execute();
+              logger.info('new_task execution result', message.tabId, result);
+            } finally {
+              releaseRunSlot();
+            }
             break;
           }
 
@@ -297,27 +336,45 @@ chrome.runtime.onConnect.addListener(port => {
           case 'follow_up_task': {
             if (!message.task) return port.postMessage({ type: 'error', error: t('bg_cmd_followUpTask_noTask') });
             if (!message.tabId) return port.postMessage({ type: 'error', error: t('bg_errors_noTabId') });
+            if (!claimRunSlot()) return port.postMessage({ type: 'error', error: t('bg_cmd_task_busy') });
 
             logger.info('follow_up_task', message.tabId, message.task);
-
-            // If executor exists, add follow-up task
-            if (currentExecutor) {
-              const executor = currentExecutor;
-              currentTaskMeta = { source: 'manual', task: message.task, startedAt: Date.now(), chain: 0 };
-              // The Executor is reused here rather than rebuilt, so it still carries the mode the
-              // session started with. Without this the picker would appear to work for the first
-              // task and be silently ignored for every follow-up after it.
-              const followUpMode = readApprovalMode(message.approvalMode);
-              if (followUpMode) executor.setApprovalMode(followUpMode);
-              executor.addFollowUpTask(message.task);
-              // Re-subscribe to events in case the previous subscription was cleaned up
-              subscribeToExecutorEvents(executor);
-              const result = await withExecutorBusy(() => executor.execute());
-              logger.info('follow_up_task execution result', message.tabId, result);
-            } else {
-              // executor was cleaned up, can not add follow-up task
-              logger.info('follow_up_task: executor was cleaned up, can not add follow-up task');
-              return port.postMessage({ type: 'error', error: t('bg_cmd_followUpTask_cleaned') });
+            try {
+              if (currentExecutor) {
+                const executor = currentExecutor;
+                currentTaskMeta = { source: 'manual', task: message.task, startedAt: Date.now(), chain: 0 };
+                currentPanelTaskId = typeof message.taskId === 'string' ? message.taskId : null;
+                // The Executor is reused here rather than rebuilt, so it still carries the mode the
+                // session started with. Without this the picker would appear to work for the first
+                // task and be silently ignored for every follow-up after it.
+                const followUpMode = readApprovalMode(message.approvalMode);
+                if (followUpMode) executor.setApprovalMode(followUpMode);
+                executor.addFollowUpTask(message.task);
+                // Re-subscribe to events in case the previous subscription was cleaned up
+                subscribeToExecutorEvents(executor);
+                const result = await executor.execute();
+                logger.info('follow_up_task execution result', message.tabId, result);
+              } else {
+                // The executor is gone - the worker restarted, or the last run was unattended and
+                // released it. Its conversation context is unrecoverable either way, so run the
+                // prompt as a fresh task in the same session instead of bouncing the user's typed
+                // prompt back as an error they cannot act on.
+                logger.info('follow_up_task: no live executor; starting a fresh task in the same session');
+                const executor = await setupExecutor(
+                  message.taskId,
+                  message.task,
+                  browserContext,
+                  readApprovalMode(message.approvalMode),
+                );
+                currentExecutor = executor;
+                currentTaskMeta = { source: 'manual', task: message.task, startedAt: Date.now(), chain: 0 };
+                currentPanelTaskId = typeof message.taskId === 'string' ? message.taskId : null;
+                subscribeToExecutorEvents(executor);
+                const result = await executor.execute();
+                logger.info('follow_up_task (fresh executor) execution result', message.tabId, result);
+              }
+            } finally {
+              releaseRunSlot();
             }
             break;
           }
@@ -469,6 +526,7 @@ chrome.runtime.onConnect.addListener(port => {
             if (!message.taskId) return port.postMessage({ type: 'error', error: t('bg_errors_noTaskId') });
             if (!message.historySessionId)
               return port.postMessage({ type: 'error', error: t('bg_cmd_replay_noHistory') });
+            if (!claimRunSlot()) return port.postMessage({ type: 'error', error: t('bg_cmd_task_busy') });
             logger.info('replay', message.tabId, message.taskId, message.historySessionId);
 
             try {
@@ -477,10 +535,15 @@ chrome.runtime.onConnect.addListener(port => {
               // Setup executor with the new taskId and a dummy task description
               const executor = await setupExecutor(message.taskId, message.task, browserContext);
               currentExecutor = executor;
+              // A replay is a panel-owned run like any other: without a meta of its own it would
+              // inherit whatever a failed schedule left in the slot, and its webhook would carry
+              // that task's identity.
+              currentTaskMeta = { source: 'manual', task: String(message.task ?? ''), startedAt: Date.now(), chain: 0 };
+              currentPanelTaskId = typeof message.taskId === 'string' ? message.taskId : null;
               subscribeToExecutorEvents(executor);
 
               // Run replayHistory with the history session ID
-              const result = await withExecutorBusy(() => executor.replayHistory(message.historySessionId));
+              const result = await executor.replayHistory(message.historySessionId);
               logger.debug('replay execution result', message.tabId, result);
             } catch (error) {
               logger.error('Replay failed:', error);
@@ -488,6 +551,8 @@ chrome.runtime.onConnect.addListener(port => {
                 type: 'error',
                 error: error instanceof Error ? error.message : t('bg_cmd_replay_failed'),
               });
+            } finally {
+              releaseRunSlot();
             }
             break;
           }
@@ -497,18 +562,27 @@ chrome.runtime.onConnect.addListener(port => {
         }
       } catch (error) {
         console.error('Error handling port message:', error);
-        port.postMessage({
-          type: 'error',
-          error: error instanceof Error ? error.message : t('errors_unknown'),
-        });
+        try {
+          port.postMessage({
+            type: 'error',
+            error: error instanceof Error ? error.message : t('errors_unknown'),
+          });
+        } catch {
+          // the port died mid-handler - that disconnect is exactly what some of these errors are
+        }
       }
     });
 
     port.onDisconnect.addListener(() => {
-      // this event is also triggered when the side panel is closed, so we need to cancel the task
       logger.debug('Side panel disconnected');
+      // A newer panel may have taken the slot since; only the port that holds it may clear it.
+      if (currentPort !== port) return;
       currentPort = null;
-      currentExecutor?.cancel();
+      // Closing the panel abandons the task the panel started - and only that. A scheduled or
+      // webhook run has no panel to lose: it writes its own outcome and must keep running.
+      if (currentTaskMeta?.source === 'manual') {
+        currentExecutor?.cancel();
+      }
     });
   }
 });
@@ -705,21 +779,26 @@ async function handleScheduleAlarm(scheduleId: number): Promise<void> {
  * task's outcome lives — a chat-history session — plus a notification that links back to it.
  */
 async function runScheduledTask(schedule: ScheduledTask): Promise<void> {
-  if (executorBusy) {
+  // Claimed synchronously: two alarms in the same tick used to both read "not busy" and run.
+  if (!claimRunSlot()) {
     // Never fight a live task for the one shared BrowserContext; skipping is the honest move.
     logger.info(`Schedule "${schedule.title}" skipped: another task is running`);
     notifySchedule(t('bg_sched_skipped_title'), t('bg_sched_skipped_body', [schedule.title]));
     return;
   }
-  await schedulesStore.markRun(schedule.id, Date.now());
-  await runUnattendedTask({
-    prompt: schedule.prompt,
-    title: schedule.title,
-    source: 'scheduled',
-    chain: 0,
-    scheduleId: schedule.id,
-    watch: schedule.watch === true,
-  });
+  try {
+    await schedulesStore.markRun(schedule.id, Date.now());
+    await runUnattendedTask({
+      prompt: schedule.prompt,
+      title: schedule.title,
+      source: 'scheduled',
+      chain: 0,
+      scheduleId: schedule.id,
+      watch: schedule.watch === true,
+    });
+  } finally {
+    releaseRunSlot();
+  }
 }
 
 /**
@@ -734,12 +813,16 @@ async function runWebhookFollowUp(followUp: WebhookFollowUp, chain: number): Pro
     notifySchedule(t('bg_followup_chainCap_title'), t('bg_followup_chainCap_body', [String(FOLLOW_UP_MAX_CHAIN)]));
     return;
   }
-  if (executorBusy) {
+  if (!claimRunSlot()) {
     logger.info(`Webhook follow-up "${title}" skipped: another task is running`);
     notifySchedule(t('bg_sched_skipped_title'), t('bg_sched_skipped_body', [title]));
     return;
   }
-  await runUnattendedTask({ prompt: followUp.task, title, source: 'followup', chain });
+  try {
+    await runUnattendedTask({ prompt: followUp.task, title, source: 'followup', chain });
+  } finally {
+    releaseRunSlot();
+  }
 }
 
 /**
@@ -752,6 +835,12 @@ async function runWebhookFollowUp(followUp: WebhookFollowUp, chain: number): Pro
  * schedule id, so the schedule dispatcher ignores it by construction.
  */
 const UNATTENDED_KEEPALIVE_ALARM = 'flowkite-unattended-keepalive';
+
+// A fresh worker has no unattended run in flight - runs die with the worker - so a keepalive left
+// behind by a worker killed mid-run must be cleared here, or it wakes the worker every 30 seconds
+// for the life of the profile. chrome.alarms persist across browser restarts; nothing else clears
+// this name (syncScheduleAlarms only touches the schedule prefix).
+void chrome.alarms.clear(UNATTENDED_KEEPALIVE_ALARM).catch(() => undefined);
 
 async function runUnattendedTask(input: {
   prompt: string;
@@ -792,6 +881,10 @@ async function runUnattendedTask(input: {
     await browserContext.switchTab(tab.id, { activate: false });
 
     const taskId = `unattended-${startedAt}`;
+    const executor = await setupExecutor(taskId, input.prompt, browserContext, 'planner', true);
+    currentExecutor = executor;
+    // After setup, which can throw: a meta written before it would outlive the failed run and
+    // stamp the next terminal event - a replay, say - with this schedule's identity.
     currentTaskMeta = {
       source: input.source,
       task: input.prompt,
@@ -799,8 +892,6 @@ async function runUnattendedTask(input: {
       startedAt,
       chain: input.chain,
     };
-    const executor = await setupExecutor(taskId, input.prompt, browserContext, 'planner', true);
-    currentExecutor = executor;
     // Port forwarding first (it clears old listeners), so an open panel watches the run live...
     subscribeToExecutorEvents(executor);
     // ...then a second subscriber captures the terminal event for the notification and history.
@@ -817,11 +908,18 @@ async function runUnattendedTask(input: {
       }
     });
 
-    await withExecutorBusy(() => executor.execute());
+    await executor.execute();
   } catch (error) {
     outcome = { ok: false, text: error instanceof Error ? error.message : String(error) };
     logger.error('Unattended task failed:', error);
   } finally {
+    // Release what this run held. Without this, the next panel follow-up found the unattended
+    // executor still in the slot and attached the user's interactive task to it - plan gate
+    // pre-approved, every sensitive action auto-declined, the schedule's conversation attached.
+    if (currentTaskMeta && currentTaskMeta.startedAt === startedAt) {
+      currentTaskMeta = null;
+    }
+    currentExecutor = null;
     await chrome.alarms.clear(UNATTENDED_KEEPALIVE_ALARM).catch(() => {});
     // Nobody is watching this tab, and nothing else closes it: the executor's cleanup detaches the
     // debugger but never removes tabs, and the task group is deliberately left in place for a task
@@ -857,7 +955,13 @@ async function runUnattendedTask(input: {
       content: outcome.text,
       timestamp: Date.now(),
       // Nobody was watching this run, so the stored message is the only copy of what it collected.
-      ...(collected && collected.rows.length > 0 ? { dataset: collected } : {}),
+      // A successful watch run that found nothing stores an explicit empty table: that IS its
+      // baseline, and without it one empty day made the next day's rows all read as brand new.
+      ...(collected && collected.rows.length > 0
+        ? { dataset: collected }
+        : input.watch && outcome.ok
+          ? { dataset: { fields: collected?.fields ?? [], rows: [], truncated: false } }
+          : {}),
     });
   } catch (error) {
     logger.error('Failed to save unattended task result:', error);
@@ -901,10 +1005,17 @@ async function runUnattendedTask(input: {
  */
 async function previousScheduledDataset(scheduleId: number): Promise<MessageDataset | undefined> {
   try {
-    const [mostRecent] = await chatHistoryStore.getSessionsForSchedule(scheduleId);
-    if (!mostRecent) return undefined;
-    const session = await chatHistoryStore.getSession(mostRecent.id);
-    return session?.messages.find(message => message.dataset)?.dataset;
+    const sessions = await chatHistoryStore.getSessionsForSchedule(scheduleId);
+    // Walk back to the most recent run that actually carried a table: a failed or cancelled run
+    // stores no dataset, and treating it as "no previous" would reset the baseline and make the
+    // next healthy run report every row as brand new. Capped so a schedule with a long history of
+    // prose answers does not turn every run into a full history read.
+    for (const meta of sessions.slice(0, 10)) {
+      const session = await chatHistoryStore.getSession(meta.id);
+      const dataset = session?.messages.find(message => message.dataset)?.dataset;
+      if (dataset) return dataset;
+    }
+    return undefined;
   } catch (error) {
     logger.error('Failed to read the previous run of this schedule:', error);
     return undefined;
@@ -935,9 +1046,11 @@ async function subscribeToExecutorEvents(executor: Executor) {
       event.state === ExecutionState.TASK_FAIL ||
       event.state === ExecutionState.TASK_CANCEL
     ) {
-      // The panel writes chat history while it is connected; with no port listening the outcome
-      // would otherwise vanish and the session keep only the user's prompt.
-      if (!currentPort) {
+      // The panel persists the outcome of the task it launched itself; the background writes
+      // everything else - no port connected, or a task this panel never started (it filters
+      // foreign taskIds out rather than splicing them into whatever session is open).
+      const terminalTaskId = typeof event.data?.taskId === 'string' ? event.data.taskId : null;
+      if (!currentPort || terminalTaskId !== currentPanelTaskId) {
         void persistOutcomeWithoutPanel(event);
       }
       // One webhook per task: the meta slot is consumed by the first terminal event. The response
@@ -956,9 +1069,15 @@ async function subscribeToExecutorEvents(executor: Executor) {
           finishedAt: Date.now(),
           // Passed unconditionally; dispatchTaskWebhook decides whether the user allowed it out.
           dataset: meta.dataset,
-        }).then(followUp => {
-          if (followUp) void runWebhookFollowUp(followUp, meta.chain + 1);
-        });
+        })
+          .then(followUp => {
+            if (followUp) {
+              runWebhookFollowUp(followUp, meta.chain + 1).catch(error =>
+                logger.error('Webhook follow-up failed to start:', error),
+              );
+            }
+          })
+          .catch(error => logger.error('Webhook dispatch failed:', error));
         currentTaskMeta = null;
       }
       await currentExecutor?.cleanup();
