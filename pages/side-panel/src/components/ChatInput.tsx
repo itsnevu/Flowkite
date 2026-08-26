@@ -17,7 +17,9 @@ interface ChatInputProps {
   disabled: boolean;
   showStopButton: boolean;
   setContent?: (setter: (text: string) => void) => void;
-  // Historical session ID - if provided, shows replay button instead of send button
+  /** true while a stored chat is on screen; a send there continues it as a new task, and a note says so */
+  isHistoricalSession?: boolean;
+  // Historical session ID - if provided, shows the replay button next to send
   historicalSessionId?: string | null;
   onReplay?: (sessionId: string) => void;
   /** how much the user signs off on before the agent acts */
@@ -78,6 +80,7 @@ export default function ChatInput({
   disabled,
   showStopButton,
   setContent,
+  isHistoricalSession = false,
   historicalSessionId,
   onReplay,
   approvalMode,
@@ -383,6 +386,14 @@ export default function ChatInput({
             </p>
           )}
 
+          {/* A stored chat accepts new prompts, but the agent starts without the old run's context
+              - said here, before the user types, rather than discovered mid-task. */}
+          {isHistoricalSession && (
+            <p className="px-1.5 text-[10px] leading-tight text-ink-faint" role="note">
+              {t('chat_history_continueNote')}
+            </p>
+          )}
+
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2">
               {/*
@@ -468,16 +479,26 @@ export default function ChatInput({
                 </button>
               </div>
             ) : historicalSessionId ? (
-              <button
-                type="button"
-                onClick={handleReplay}
-                disabled={!historicalSessionId}
-                aria-disabled={!historicalSessionId}
-                className={`flex h-9 shrink-0 items-center rounded-pill px-4 text-xs font-medium ${GRAPHITE_KEY} ${
-                  !historicalSessionId ? GRAPHITE_KEY_DISABLED : GRAPHITE_KEY_IDLE
-                }`}>
-                {t('chat_buttons_replay')}
-              </button>
+              // A stored chat answers to both keys: replay the old run, or send to continue it.
+              <div className="flex shrink-0 items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleReplay}
+                  className={`flex h-9 shrink-0 items-center rounded-pill px-4 text-xs font-medium ${GRAPHITE_KEY} ${GRAPHITE_KEY_IDLE}`}>
+                  {t('chat_buttons_replay')}
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSendButtonDisabled}
+                  aria-disabled={isSendButtonDisabled}
+                  aria-label={t('chat_buttons_send')}
+                  title={t('chat_buttons_send')}
+                  className={`grid size-9 shrink-0 place-items-center rounded-pill ${GRAPHITE_KEY} ${
+                    isSendButtonDisabled ? GRAPHITE_KEY_DISABLED : GRAPHITE_KEY_IDLE
+                  }`}>
+                  <FaArrowUp className="size-3.5" aria-hidden="true" />
+                </button>
+              </div>
             ) : (
               <button
                 type="submit"

@@ -170,6 +170,12 @@
   "chat_history_reuse": {
     "message": "Use this task again"
   },
+  "chat_history_continueNote": {
+    "message": "Sending here continues this saved chat as a new task; the agent starts fresh and does not remember the earlier run"
+  },
+  "chat_history_taskStillRunning": {
+    "message": "A task is still running in the live chat. Go back to it to send corrections, or stop it before starting a task here."
+  },
   "chat_bookmarks_header": {
     "message": "Quick Start"
   },
@@ -1390,6 +1396,9 @@
   "bg_cmd_steer_notRunning": {
     "message": "Steering is only possible while a task is running."
   },
+  "bg_task_tabClosed": {
+    "message": "The tab this task was working in was closed, so the task stopped."
+  },
   "chat_buttons_steer": {
     "message": "Send correction"
   },
@@ -2211,6 +2220,12 @@
   },
   "chat_mode_auto_desc": {
     "message": "Runs the whole task without asking."
+  },
+  "chat_mode_fast": {
+    "message": "Fast"
+  },
+  "chat_mode_fast_desc": {
+    "message": "Starts right away and re-plans less; still asks before risky actions."
   },
   "chat_mode_planner": {
     "message": "Planner"

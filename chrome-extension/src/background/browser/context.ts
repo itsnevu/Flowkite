@@ -47,6 +47,12 @@ export default class BrowserContext {
   private _activityDetail: string | null = null;
   /** Called when the user presses the stop button drawn on the page. */
   private _activityStopHandler: (() => void) | null = null;
+  /**
+   * Tabs this context closed itself, so `tabs.onRemoved` can tell the agent tidying up after its
+   * own `closeTab` apart from the user closing the tab out from under a running task. Entries are
+   * consumed by the first onRemoved that asks about them.
+   */
+  private _agentClosedTabs: Set<number> = new Set();
 
   constructor(config: Partial<BrowserContextConfig>) {
     this._config = { ...DEFAULT_BROWSER_CONTEXT_CONFIG, ...config };
@@ -443,12 +449,32 @@ export default class BrowserContext {
 
   public async closeTab(tabId: number): Promise<void> {
     await this.detachPage(tabId);
+    // recorded before the remove, because onRemoved fires while the await below is still pending
+    this._agentClosedTabs.add(tabId);
     await chrome.tabs.remove(tabId);
     this._tabGroup?.forget(tabId);
     // update current tab id if needed
     if (this._currentTabId === tabId) {
       this._currentTabId = null;
     }
+  }
+
+  /** Whether this tab is the one the task is working in right now. */
+  public isCurrentTab(tabId: number): boolean {
+    return this._currentTabId === tabId;
+  }
+
+  /** Whether a task holds this tab. Tabs the user browses on their own are none of ours. */
+  public isAttachedTab(tabId: number): boolean {
+    return this._attachedPages.has(tabId);
+  }
+
+  /**
+   * Whether this context closed the tab itself. Consuming the entry keeps the set from growing,
+   * and a reused tab id later in the session must not still read as agent-closed.
+   */
+  public consumeAgentClosedTab(tabId: number): boolean {
+    return this._agentClosedTabs.delete(tabId);
   }
 
   /**

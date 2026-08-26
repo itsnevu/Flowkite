@@ -32,7 +32,7 @@ import { analytics } from './services/analytics';
 import type { WebhookFollowUp } from './services/webhookContract';
 import type { TaskWebhookPayload } from './services/webhook';
 import type { ScheduledTask, ApprovalMode, MessageDataset } from '@extension/storage';
-import type { DatasetPayload } from './agent/event/types';
+import type { AgentEvent, DatasetPayload } from './agent/event/types';
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
 
 const logger = createLogger('background');
@@ -176,7 +176,10 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
 });
 
 chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
-  if (tabId && changeInfo.status === 'complete' && tab.url?.startsWith('http')) {
+  // Pre-warm only the tabs a task is actually driving. The parse path injects on demand anyway
+  // (see _buildDomTree), so this is purely latency - and the extension has no business planting
+  // script in every page the user browses on their own.
+  if (tabId && changeInfo.status === 'complete' && tab.url?.startsWith('http') && browserContext.isAttachedTab(tabId)) {
     await injectBuildDomTreeScripts(tabId);
   }
 });
@@ -195,7 +198,17 @@ chrome.debugger.onDetach.addListener(async (source, reason) => {
 
 // Cleanup when tab is closed
 chrome.tabs.onRemoved.addListener(tabId => {
+  // Both facts must be read before removeAttachedPage forgets which tab was current.
+  const closedByAgent = browserContext.consumeAgentClosedTab(tabId);
+  const userClosedTaskTab = !closedByAgent && browserContext.isCurrentTab(tabId);
   browserContext.removeAttachedPage(tabId);
+  // The user closing the tab a task is driving is an instruction to stop, not an obstacle to route
+  // around: without this the next step attaches to whatever tab the user is looking at and drives
+  // that instead.
+  if (userClosedTaskTab && executorBusy && currentExecutor) {
+    logger.info(`Task tab ${tabId} was closed by the user; stopping the task`);
+    void currentExecutor.cancel(t('bg_task_tabClosed'));
+  }
 });
 
 logger.info('background loaded');
@@ -922,6 +935,11 @@ async function subscribeToExecutorEvents(executor: Executor) {
       event.state === ExecutionState.TASK_FAIL ||
       event.state === ExecutionState.TASK_CANCEL
     ) {
+      // The panel writes chat history while it is connected; with no port listening the outcome
+      // would otherwise vanish and the session keep only the user's prompt.
+      if (!currentPort) {
+        void persistOutcomeWithoutPanel(event);
+      }
       // One webhook per task: the meta slot is consumed by the first terminal event. The response
       // may carry a follow-up task (opt-in, chain-capped) - the two-way half of the webhook.
       if (currentTaskMeta) {
@@ -946,4 +964,36 @@ async function subscribeToExecutorEvents(executor: Executor) {
       await currentExecutor?.cleanup();
     }
   });
+}
+
+/**
+ * Write a task's outcome into its chat session when no panel was connected to hear it.
+ *
+ * The side panel is normally the writer of chat history, but it only writes what reaches it over
+ * the port: a task that ended after the panel closed - including the cancel that closing the panel
+ * itself triggers, and the cancel for a closed task tab - left the session holding the user's
+ * prompt and nothing else.
+ */
+async function persistOutcomeWithoutPanel(event: AgentEvent): Promise<void> {
+  const taskId = event.data?.taskId;
+  // Unattended runs write their own session, dataset included; this path is only for sessions the
+  // panel created and then stopped watching.
+  if (!taskId || typeof taskId !== 'string' || taskId.startsWith('unattended-')) return;
+  const details = event.data?.details ?? '';
+  // Same fallback the panel applies: the executor reports the task id when the planner returned no
+  // final answer, and a raw UUID is not an answer.
+  const content =
+    event.state === ExecutionState.TASK_OK && (!details || details === taskId) ? t('chat_result_completed') : details;
+  // Read synchronously, before the terminal handler hands the meta slot to the webhook.
+  const dataset = currentTaskMeta?.dataset;
+  try {
+    await chatHistoryStore.addMessage(taskId, {
+      actor: Actors.SYSTEM,
+      content,
+      timestamp: event.timestamp,
+      ...(dataset && dataset.rows.length > 0 ? { dataset } : {}),
+    });
+  } catch (error) {
+    logger.error('Failed to save the task outcome to chat history:', error);
+  }
 }

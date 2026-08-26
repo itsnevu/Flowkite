@@ -249,8 +249,11 @@ export const useTaskDispatch = ({
       if (wasHandled) return;
     }
 
-    // Block sending messages in historical sessions
-    if (isHistoricalSession) {
+    // A stored chat on screen while another task runs live: a send here can neither steer that
+    // task legibly nor start a second one, so explain and redirect rather than dropping the text.
+    // Shown, not persisted - the notice is about this moment, not part of the stored conversation.
+    if (isHistoricalSession && taskRunning) {
+      appendMessage({ actor: Actors.SYSTEM, content: t('chat_history_taskStillRunning'), timestamp: Date.now() }, null);
       return;
     }
 
@@ -280,8 +283,13 @@ export const useTaskDispatch = ({
       setInputEnabled(false);
       setShowStopButton(true);
 
-      // Create a new chat session for this task if not in follow-up mode
-      if (!isFollowUpMode) {
+      if (isHistoricalSession) {
+        // Continuing a stored chat: keep its session so the new task's messages land in the same
+        // conversation, and let the panel treat it as live again. The executor starts fresh - it
+        // does not remember the stored run - which the composer's note says out loud.
+        setIsHistoricalSession(false);
+      } else if (!isFollowUpMode) {
+        // Create a new chat session for this task
         // Use display text for session title if available, otherwise use full text
         const titleText = displayText || text;
         const newSession = await chatHistoryStore.createSession(

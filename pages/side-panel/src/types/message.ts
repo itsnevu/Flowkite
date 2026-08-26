@@ -5,7 +5,9 @@ export const ACTOR_PROFILES = {
     iconBackground: '#4CAF50',
   },
   system: {
-    name: 'System',
+    // The product's own voice. Task outcomes, notices and errors all arrive under this actor, and
+    // to the user they come from Flowkite - "System" read like machinery talking about itself.
+    name: 'Flowkite',
     icon: 'icons/system.svg',
     iconBackground: '#2196F3',
   },

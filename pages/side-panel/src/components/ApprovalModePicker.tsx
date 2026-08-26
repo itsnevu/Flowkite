@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { FaBolt, FaCheck, FaChevronDown, FaClipboardCheck, FaHandPaper } from 'react-icons/fa';
+import { FaBolt, FaCheck, FaChevronDown, FaClipboardCheck, FaHandPaper, FaRocket } from 'react-icons/fa';
 import { t } from '@extension/i18n';
 import type { IconType } from 'react-icons';
 import type { ApprovalMode } from '@extension/storage';
@@ -13,6 +13,7 @@ interface ApprovalModePickerProps {
 /** Order runs loosest to tightest, so the list reads as a dial rather than an arbitrary menu. */
 const MODES: ReadonlyArray<{ value: ApprovalMode; Icon: IconType; label: () => string; desc: () => string }> = [
   { value: 'auto', Icon: FaBolt, label: () => t('chat_mode_auto'), desc: () => t('chat_mode_auto_desc') },
+  { value: 'fast', Icon: FaRocket, label: () => t('chat_mode_fast'), desc: () => t('chat_mode_fast_desc') },
   {
     value: 'planner',
     Icon: FaClipboardCheck,
@@ -22,7 +23,8 @@ const MODES: ReadonlyArray<{ value: ApprovalMode; Icon: IconType; label: () => s
   { value: 'manual', Icon: FaHandPaper, label: () => t('chat_mode_manual'), desc: () => t('chat_mode_manual_desc') },
 ];
 
-const FALLBACK_MODE = MODES[1];
+// By value, not by index: the dial gains entries and the fallback must stay the gated default.
+const FALLBACK_MODE = MODES.find(m => m.value === 'planner') ?? MODES[0];
 
 /**
  * The composer's mode dial.

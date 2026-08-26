@@ -170,6 +170,12 @@
   "chat_history_reuse": {
     "message": "Usar esta tarefa de novo"
   },
+  "chat_history_continueNote": {
+    "message": "Enviar aqui continua esta conversa salva como uma nova tarefa; o agente começa do zero e não lembra da execução anterior"
+  },
+  "chat_history_taskStillRunning": {
+    "message": "Uma tarefa ainda está em execução no chat ao vivo. Volte a ele para enviar correções, ou pare-a antes de iniciar uma tarefa aqui."
+  },
   "chat_bookmarks_header": {
     "message": "Início Rápido"
   },
@@ -1390,6 +1396,9 @@
   "bg_cmd_steer_notRunning": {
     "message": "Só é possível orientar enquanto uma tarefa está em execução."
   },
+  "bg_task_tabClosed": {
+    "message": "A aba em que esta tarefa trabalhava foi fechada, então a tarefa parou."
+  },
   "chat_buttons_steer": {
     "message": "Enviar correção"
   },
@@ -2211,6 +2220,12 @@
   },
   "chat_mode_auto_desc": {
     "message": "Executa a tarefa inteira sem perguntar."
+  },
+  "chat_mode_fast": {
+    "message": "Rápido"
+  },
+  "chat_mode_fast_desc": {
+    "message": "Começa na hora e replaneja menos; ainda pergunta antes de ações arriscadas."
   },
   "chat_mode_planner": {
     "message": "Planejador"

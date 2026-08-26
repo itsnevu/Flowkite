@@ -1,7 +1,13 @@
 import { t } from '@extension/i18n';
 import { createLogger } from '@src/background/log';
 import { chatHistoryStore } from '@extension/storage/lib/chat';
-import { memoryStore, observedModelsStore, requiresPlanApproval, estimateCostUsd } from '@extension/storage';
+import {
+  memoryStore,
+  observedModelsStore,
+  requiresPlanApproval,
+  skipsPeriodicPlanning,
+  estimateCostUsd,
+} from '@extension/storage';
 import { URLNotAllowedError } from '../browser/views';
 import { TabGroupStatus } from '../browser/tabGroup';
 import { analytics } from '../services/analytics';
@@ -101,6 +107,11 @@ export class Executor {
    * a model call that is already in flight.
    */
   private pendingSteers: string[] = [];
+  /**
+   * Why the run was cancelled, when the canceller said. TASK_CANCEL's detail is the one line the
+   * user keeps, and "Task cancelled" explains nothing when it was the closed tab that ended it.
+   */
+  private cancelReason: string | null = null;
   /**
    * Watches for the run that is busy and going nowhere - every action succeeding, the page never
    * moving. Per-Executor and reset per task, like the failure counter it complements.
@@ -307,6 +318,8 @@ export class Executor {
     // abort signal.
     context.resetForTask();
     this.stall.reset();
+    // a follow-up on this Executor must not inherit the reason the previous run was cancelled
+    this.cancelReason = null;
     // Per-Executor rather than per-context, but per-task all the same: the brake is latched so it
     // asks once, and leaving it latched meant a follow-up spent with no ceiling at all.
     this.budgetPauseIssued = false;
@@ -357,8 +370,13 @@ export class Executor {
 
         // Run planner periodically for guidance, and always right after a correction: next_steps is
         // where the old direction is written down, so leaving it stale means the navigator reads
-        // the correction and the plan contradicting it in the same breath.
-        if (this.planner && (steered || context.nSteps % context.options.planningInterval === 0 || navigatorDone)) {
+        // the correction and the plan contradicting it in the same breath. Fast mode keeps the
+        // first plan - it aims the whole run - and drops the periodic re-plans between it and the
+        // finish: those model calls are most of what "fast" saves.
+        const planningDue =
+          context.nSteps % context.options.planningInterval === 0 &&
+          (context.nSteps === 0 || !skipsPeriodicPlanning(this.approvalMode));
+        if (this.planner && (steered || planningDue || navigatorDone)) {
           navigatorDone = false;
           justPlanned = true;
           latestPlanOutput = await this.runPlanner();
@@ -414,7 +432,7 @@ export class Executor {
         const errorCategory = analytics.categorizeError(maxStepsError);
         void analytics.trackTaskFailed(this.context.taskId, errorCategory);
       } else if (this.context.stopped) {
-        this.context.emitEvent(Actors.SYSTEM, ExecutionState.TASK_CANCEL, t('exec_task_cancel'));
+        this.context.emitEvent(Actors.SYSTEM, ExecutionState.TASK_CANCEL, this.cancelReason ?? t('exec_task_cancel'));
         tabGroupStatus = TabGroupStatus.Cancelled;
 
         // Track task cancellation
@@ -428,7 +446,7 @@ export class Executor {
       // Rows collected before the failure are still rows the user asked for.
       this.emitDataset();
       if (error instanceof RequestCancelledError) {
-        this.context.emitEvent(Actors.SYSTEM, ExecutionState.TASK_CANCEL, t('exec_task_cancel'));
+        this.context.emitEvent(Actors.SYSTEM, ExecutionState.TASK_CANCEL, this.cancelReason ?? t('exec_task_cancel'));
         tabGroupStatus = TabGroupStatus.Cancelled;
 
         // Track task cancellation
@@ -809,7 +827,8 @@ export class Executor {
     return false;
   }
 
-  async cancel(): Promise<void> {
+  async cancel(reason?: string): Promise<void> {
+    this.cancelReason = reason ?? null;
     // release the plan-approval gate first, otherwise execute() stays blocked on it forever
     this.planApprovalResolver?.(false);
     this.context.stop();

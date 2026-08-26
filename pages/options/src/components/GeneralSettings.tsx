@@ -16,6 +16,7 @@ const numberFieldClass =
 
 const APPROVAL_MODE_LABELS: Record<ApprovalMode, () => string> = {
   auto: () => t('chat_mode_auto'),
+  fast: () => t('chat_mode_fast'),
   planner: () => t('chat_mode_planner'),
   manual: () => t('chat_mode_manual'),
 };

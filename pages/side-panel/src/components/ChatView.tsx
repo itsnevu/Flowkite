@@ -132,10 +132,12 @@ const ChatView = ({
             isRecording={isRecording}
             isProcessingSpeech={isProcessingSpeech}
             // A run in flight keeps the composer live: what is typed there becomes a correction
-            // rather than a task, which is the point of steering.
-            disabled={(!inputEnabled && !showStopButton) || isHistoricalSession}
+            // rather than a task, which is the point of steering. A stored session keeps it live
+            // too - a send there continues the conversation as a new task.
+            disabled={!inputEnabled && !showStopButton}
             showStopButton={showStopButton}
             setContent={onSetInputText}
+            isHistoricalSession={isHistoricalSession}
             historicalSessionId={isHistoricalSession && replayEnabled ? currentSessionId : null}
             onReplay={onReplay}
             approvalMode={approvalMode}
@@ -222,10 +224,12 @@ const ChatView = ({
           isRecording={isRecording}
           isProcessingSpeech={isProcessingSpeech}
           // A run in flight keeps the composer live: what is typed there becomes a correction
-          // rather than a task, which is the point of steering.
-          disabled={(!inputEnabled && !showStopButton) || isHistoricalSession}
+          // rather than a task, which is the point of steering. A stored session keeps it live
+          // too - a send there continues the conversation as a new task.
+          disabled={!inputEnabled && !showStopButton}
           showStopButton={showStopButton}
           setContent={onSetInputText}
+          isHistoricalSession={isHistoricalSession}
           historicalSessionId={isHistoricalSession && replayEnabled ? currentSessionId : null}
           onReplay={onReplay}
           approvalMode={approvalMode}

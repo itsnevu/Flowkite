@@ -3,9 +3,9 @@ import { createStorage } from '../base/base';
 import type { BaseStorage } from '../base/types';
 
 /** How much of the agent's work the user signs off on before it happens. */
-export type ApprovalMode = 'auto' | 'planner' | 'manual';
+export type ApprovalMode = 'auto' | 'fast' | 'planner' | 'manual';
 
-export const APPROVAL_MODES: readonly ApprovalMode[] = ['auto', 'planner', 'manual'];
+export const APPROVAL_MODES: readonly ApprovalMode[] = ['auto', 'fast', 'planner', 'manual'];
 
 /**
  * Which gates each mode runs. One definition, read by both the background and the UI, so the
@@ -14,10 +14,16 @@ export const APPROVAL_MODES: readonly ApprovalMode[] = ['auto', 'planner', 'manu
  * `auto` runs no gates at all - not even before money or credentials. That is a deliberate product
  * decision: a mode labelled "no checks" that sometimes checks is one nobody can reason about. It is
  * why choosing it requires an explicit acknowledgement (`autoModeAcknowledged`) the first time.
+ *
+ * `fast` is the speed dial, not a second no-checks mode: it skips the plan review (the wait for a
+ * human click) and the periodic mid-task re-plans, but still stops before money, credentials and
+ * the other sensitive steps - which is why it needs no acknowledgement.
  */
-export const requiresPlanApproval = (mode: ApprovalMode): boolean => mode !== 'auto';
+export const requiresPlanApproval = (mode: ApprovalMode): boolean => mode !== 'auto' && mode !== 'fast';
 export const confirmsSensitiveActions = (mode: ApprovalMode): boolean => mode !== 'auto';
 export const confirmsEveryAction = (mode: ApprovalMode): boolean => mode === 'manual';
+/** Fast plans once to aim the run, then again only when steered or when the navigator says it is done. */
+export const skipsPeriodicPlanning = (mode: ApprovalMode): boolean => mode === 'fast';
 
 /**
  * What grounding the agent draws on the page it is driving.

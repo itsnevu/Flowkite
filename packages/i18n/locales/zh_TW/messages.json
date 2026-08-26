@@ -170,6 +170,12 @@
   "chat_history_reuse": {
     "message": "再次使用這個任務"
   },
+  "chat_history_continueNote": {
+    "message": "在這裡傳送訊息會以新任務接續這個已儲存的對話；代理程式會重新開始，不會記得先前的執行內容"
+  },
+  "chat_history_taskStillRunning": {
+    "message": "即時對話中仍有任務在執行。請回到該對話傳送修正，或先停止它再在這裡開始新任務。"
+  },
   "chat_bookmarks_header": {
     "message": "快速入門"
   },
@@ -1390,6 +1396,9 @@
   "bg_cmd_steer_notRunning": {
     "message": "只有在任務執行中才能即時指正。"
   },
+  "bg_task_tabClosed": {
+    "message": "這項任務所在的分頁已被關閉，任務已停止。"
+  },
   "chat_buttons_steer": {
     "message": "傳送修正"
   },
@@ -2211,6 +2220,12 @@
   },
   "chat_mode_auto_desc": {
     "message": "整個任務都不詢問，直接執行。"
+  },
+  "chat_mode_fast": {
+    "message": "快速"
+  },
+  "chat_mode_fast_desc": {
+    "message": "立即開始並減少重新規劃；執行高風險動作前仍會詢問。"
   },
   "chat_mode_planner": {
     "message": "計畫"
