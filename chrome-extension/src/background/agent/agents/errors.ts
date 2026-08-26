@@ -290,6 +290,20 @@ export class RequestCancelledError extends Error {
   }
 }
 
+/**
+ * The model asked for an element index that is not in the current page's map.
+ *
+ * Routine on dynamic pages - the snapshot goes stale between read and act - and self-healing: the
+ * message is fed back to the model, which re-reads the page on its next step. Typed so the
+ * navigator can log it as the warning it is instead of painting the console red.
+ */
+export class StaleElementError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'StaleElementError';
+  }
+}
+
 export class ExtensionConflictError extends Error {
   /**
    * Creates a new ExtensionConflictError

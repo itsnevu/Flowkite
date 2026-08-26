@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { createLogger } from '@src/background/log';
 import { memoryStore, MemoryScope, uploadsStore } from '@extension/storage';
 import { wrapUntrustedContent } from '../messages/utils';
+import { StaleElementError } from '../agents/errors';
 import { ExecutionState, Actors } from '../event/types';
 import {
   runSubtasksInParallel,
@@ -301,7 +302,7 @@ export class ActionBuilder {
         const page = await this.context.browserContext.getCurrentPage();
         const elementNode = await this.resolveElement(page, input.index);
         if (!elementNode) {
-          throw new Error(t('act_errors_elementNotExist', [input.index.toString()]));
+          throw new StaleElementError(t('act_errors_elementNotExist', [input.index.toString()]));
         }
 
         // Check if element is a file uploader
@@ -397,7 +398,7 @@ export class ActionBuilder {
         const page = await this.context.browserContext.getCurrentPage();
         const elementNode = await this.resolveElement(page, input.index);
         if (!elementNode) {
-          throw new Error(t('act_errors_elementNotExist', [input.index.toString()]));
+          throw new StaleElementError(t('act_errors_elementNotExist', [input.index.toString()]));
         }
 
         await page.hoverElementNode(elementNode);
@@ -419,7 +420,7 @@ export class ActionBuilder {
         const page = await this.context.browserContext.getCurrentPage();
         const elementNode = await this.resolveElement(page, input.index);
         if (!elementNode) {
-          throw new Error(t('act_errors_elementNotExist', [input.index.toString()]));
+          throw new StaleElementError(t('act_errors_elementNotExist', [input.index.toString()]));
         }
 
         await page.inputTextElementNode(this.context.options.useVision, elementNode, input.text);

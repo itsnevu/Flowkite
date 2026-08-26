@@ -28,6 +28,7 @@ import {
   LLM_FORBIDDEN_ERROR_MESSAGE,
   RequestCancelledError,
   MaxTokensExceededError,
+  StaleElementError,
 } from './errors';
 import { BaseAgent, type BaseAgentOptions, type ExtraAgentOptions } from './base';
 import type { Action } from '../actions/builder';
@@ -594,7 +595,10 @@ export class NavigatorAgent extends BaseAgent<z.ZodType, NavigatorResult> {
           throw error;
         }
         const errorMessage = error instanceof Error ? error.message : String(error);
-        logger.error(
+        // A stale element index is routine and self-healing (the message below sends the model back
+        // to re-read the page), so it logs as a warning; everything else here is a real error.
+        const logAction = error instanceof StaleElementError ? logger.warning : logger.error;
+        logAction(
           'doAction error',
           actionName,
           JSON.stringify(actionArgs, null, 2),

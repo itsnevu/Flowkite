@@ -555,7 +555,13 @@ export class Executor {
 
     if (!approved) {
       logger.info('🚫 Plan rejected by user');
-      this.context.emitEvent(Actors.SYSTEM, ExecutionState.PLAN_REJECTED, t('exec_plan_rejected'));
+      // A rejection that arrived as a cancel-with-reason (the task tab was closed) is not the user
+      // answering the card. The panel latches the first terminal event it sees, so emitting
+      // PLAN_REJECTED here would bury the reason; let TASK_CANCEL carry it instead - the panel
+      // clears the plan card on that event too.
+      if (!this.cancelReason) {
+        this.context.emitEvent(Actors.SYSTEM, ExecutionState.PLAN_REJECTED, t('exec_plan_rejected'));
+      }
       await this.context.stop();
       return false;
     }
