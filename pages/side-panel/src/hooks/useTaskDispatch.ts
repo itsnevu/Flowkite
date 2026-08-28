@@ -296,9 +296,9 @@ export const useTaskDispatch = ({
 
       if (isHistoricalSession) {
         // Continuing a stored chat: keep its session so the new task's messages land in the same
-        // conversation, and let the panel treat it as live again. The executor starts fresh - it
-        // does not remember the stored run - which the composer's note says out loud.
+        // conversation, and let the panel treat it as live again.
         setIsHistoricalSession(false);
+        setIsFollowUpMode(true);
       } else if (!isFollowUpMode) {
         // Create a new chat session for this task
         // Use display text for session title if available, otherwise use full text

@@ -278,6 +278,28 @@ export default class MessageManager {
   }
 
   /**
+   * Adds prior conversation exchanges from the current chat session into history.
+   *
+   * Formats past user prompts and agent responses clearly so the model understands the
+   * multi-turn conversation flow without confusing past tasks with current ones.
+   */
+  public addSessionHistory(exchanges: Array<{ actor: string; content: string }>): void {
+    if (exchanges.length === 0) return;
+
+    for (const item of exchanges) {
+      const cleaned = filterExternalContent(item.content);
+      if (!cleaned) continue;
+
+      if (item.actor === 'user') {
+        const wrapped = wrapUserRequest(`Previous user prompt in this session: """${cleaned}"""`, false);
+        this.addMessageWithTokens(new HumanMessage({ content: wrapped }));
+      } else {
+        this.addMessageWithTokens(new AIMessage({ content: `Previous outcome: ${cleaned}` }));
+      }
+    }
+  }
+
+  /**
    * Adds a plan message to the history
    * @param plan - The raw description of the plan
    * @param position - The position to add the plan

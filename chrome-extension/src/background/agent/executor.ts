@@ -91,6 +91,8 @@ export class Executor {
   private planApproved = false;
   /** Whether remembered preferences were already loaded for the task currently being worked on. */
   private memoriesInjected = false;
+  /** Whether previous session conversation history was already injected. */
+  private sessionHistoryInjected = false;
   /** Price entries snapshotted at construction; empty means nothing is priced and the brake stays off. */
   private readonly modelPricing: ModelPricingConfig;
   /**
@@ -341,6 +343,7 @@ export class Executor {
       this.context.browserContext.startTaskGroup(this.tasks[this.tasks.length - 1]);
 
       await this.injectMemories();
+      await this.injectSessionHistory();
 
       // Track task start
       void analytics.trackTaskStart(this.context.taskId);
@@ -525,6 +528,54 @@ export class Executor {
       logger.info(`🧠 Loaded ${memories.length} remembered preference(s)`);
     } catch (error) {
       logger.error(`Failed to load memories, continuing without them: ${error}`);
+    }
+  }
+
+  /**
+   * Load previous conversation exchanges from this chat session into the task's context window.
+   *
+   * Limits to the most recent 20 exchanges to maintain performance while preserving relevant
+   * multi-turn context across task executions in the same session.
+   */
+  private async injectSessionHistory(): Promise<void> {
+    if (this.sessionHistoryInjected) return;
+    this.sessionHistoryInjected = true;
+
+    try {
+      const session = await chatHistoryStore.getSession(this.context.taskId);
+      if (!session || !session.messages || session.messages.length === 0) return;
+
+      const currentTaskStr = (this.tasks[this.tasks.length - 1] || '').trim();
+      const previousMessages = session.messages.filter(msg => {
+        if (!msg.content) return false;
+        const content = msg.content.trim();
+        if (content.startsWith('/') || content.startsWith('Replay of') || content.includes('Replay')) {
+          return false;
+        }
+        if (content === currentTaskStr) {
+          return false;
+        }
+        return (
+          msg.actor === Actors.USER ||
+          msg.actor === Actors.SYSTEM ||
+          msg.actor === Actors.NAVIGATOR ||
+          msg.actor === Actors.PLANNER
+        );
+      });
+
+      if (previousMessages.length === 0) return;
+
+      // Cap to the last 20 messages for context efficiency
+      const recentMessages = previousMessages.slice(-20);
+      const exchanges = recentMessages.map(msg => ({
+        actor: msg.actor === Actors.USER ? 'user' : 'agent',
+        content: msg.content,
+      }));
+
+      this.context.messageManager.addSessionHistory(exchanges);
+      logger.info(`💬 Loaded ${exchanges.length} previous session exchange(s) for task ${this.context.taskId}`);
+    } catch (error) {
+      logger.error(`Failed to load session history, continuing without it: ${error}`);
     }
   }
 
