@@ -2,7 +2,17 @@ import { useState } from 'react';
 import '@src/Options.css';
 import { withErrorBoundary, withSuspense } from '@extension/shared';
 import { t } from '@extension/i18n';
-import { FiSettings, FiCpu, FiShield, FiTrendingUp, FiHelpCircle, FiDatabase, FiClock, FiEye } from 'react-icons/fi';
+import {
+  FiSettings,
+  FiCpu,
+  FiShield,
+  FiTrendingUp,
+  FiHelpCircle,
+  FiDatabase,
+  FiClock,
+  FiEye,
+  FiZap,
+} from 'react-icons/fi';
 import { GeneralSettings } from './components/GeneralSettings';
 import { ModelSettings } from './components/ModelSettings';
 import { FirewallSettings } from './components/FirewallSettings';
@@ -10,13 +20,24 @@ import { AnalyticsSettings } from './components/AnalyticsSettings';
 import { MemorySettings } from './components/MemorySettings';
 import { ScheduleSettings } from './components/ScheduleSettings';
 import { PrivacySettings } from './components/PrivacySettings';
+import { SkillSettings } from './components/SkillSettings';
 
-type TabTypes = 'general' | 'models' | 'firewall' | 'schedules' | 'memory' | 'privacy' | 'analytics' | 'help';
+type TabTypes =
+  | 'general'
+  | 'models'
+  | 'firewall'
+  | 'skills'
+  | 'schedules'
+  | 'memory'
+  | 'privacy'
+  | 'analytics'
+  | 'help';
 
 const TABS: { id: TabTypes; icon: React.ComponentType<{ className?: string }>; label: string }[] = [
   { id: 'general', icon: FiSettings, label: t('options_tabs_general') },
   { id: 'models', icon: FiCpu, label: t('options_tabs_models') },
   { id: 'firewall', icon: FiShield, label: t('options_tabs_firewall') },
+  { id: 'skills', icon: FiZap, label: t('options_tabs_skills') },
   { id: 'schedules', icon: FiClock, label: t('options_tabs_schedules') },
   { id: 'memory', icon: FiDatabase, label: t('options_tabs_memory') },
   { id: 'privacy', icon: FiEye, label: t('options_tabs_privacy') },
@@ -35,8 +56,18 @@ const TAB_ACTIVE =
 /** Everything else is a secondary key — pale, flush, ready to be pushed. */
 const TAB_IDLE = 'bg-canvas-raised text-ink shadow-neu-sm hover:shadow-neu active:shadow-neu-inset-sm';
 
+/**
+ * The pane to open on: `#skills` and the like, so the side panel can link straight to one pane.
+ * Anything unknown, and the external help link, fall back to the model settings as before.
+ */
+function initialTab(): TabTypes {
+  const wanted = window.location.hash.replace(/^#/, '');
+  const match = TABS.find(tab => tab.id === wanted && tab.id !== 'help');
+  return match ? match.id : 'models';
+}
+
 const Options = () => {
-  const [activeTab, setActiveTab] = useState<TabTypes>('models');
+  const [activeTab, setActiveTab] = useState<TabTypes>(initialTab);
 
   const handleTabClick = (tabId: TabTypes) => {
     if (tabId === 'help') {
@@ -54,6 +85,8 @@ const Options = () => {
         return <ModelSettings />;
       case 'firewall':
         return <FirewallSettings />;
+      case 'skills':
+        return <SkillSettings />;
       case 'schedules':
         return <ScheduleSettings />;
       case 'memory':

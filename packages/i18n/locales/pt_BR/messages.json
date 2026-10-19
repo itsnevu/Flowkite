@@ -330,7 +330,7 @@
     "message": "Ocorreu um Erro"
   },
   "options_masthead_subtitle": {
-    "message": "Automação web multiagente local — ajuste os agentes, seus limites e suas proteções."
+    "message": "Automação web multiagente local. Ajuste os agentes, seus limites e suas proteções."
   },
   "options_general_header": {
     "message": "Geral"
@@ -2127,7 +2127,7 @@
     "message": "Limite atingido"
   },
   "chat_dataset_showing": {
-    "message": "Mostrando $SHOWN$ de $TOTAL$ linhas — baixe para obter todas.",
+    "message": "Mostrando $SHOWN$ de $TOTAL$ linhas. Baixe para obter todas.",
     "placeholders": {
       "shown": {
         "content": "$1",
@@ -2367,5 +2367,358 @@
   },
   "act_crawl_result": {
     "message": "Progresso: $1 páginas lidas, $2 linhas coletadas, $3 URLs pendentes, $4 páginas com falha."
+  },
+  "act_useSkill_start": {
+    "message": "Carregando a skill $NAME$",
+    "placeholders": {
+      "name": {
+        "content": "$1",
+        "example": "web-research"
+      }
+    }
+  },
+  "act_useSkill_ok": {
+    "message": "Usando a skill $NAME$",
+    "placeholders": {
+      "name": {
+        "content": "$1",
+        "example": "web-research"
+      }
+    }
+  },
+  "act_useSkill_already": {
+    "message": "A skill $NAME$ já está carregada",
+    "placeholders": {
+      "name": {
+        "content": "$1",
+        "example": "web-research"
+      }
+    }
+  },
+  "act_useSkill_notFound": {
+    "message": "Não há skill ativa chamada $NAME$. Skills disponíveis: $AVAILABLE$",
+    "placeholders": {
+      "name": {
+        "content": "$1",
+        "example": "price-watch"
+      },
+      "available": {
+        "content": "$2",
+        "example": "web-research, fill-form"
+      }
+    }
+  },
+  "exec_skill_applied": {
+    "message": "Usando a skill $NAME$ que você escolheu",
+    "placeholders": {
+      "name": {
+        "content": "$1",
+        "example": "web-research"
+      }
+    }
+  },
+  "act_pageChange": {
+    "message": "Agora em $HOST$: $TITLE$",
+    "placeholders": {
+      "host": {
+        "content": "$1",
+        "example": "github.com"
+      },
+      "title": {
+        "content": "$2",
+        "example": "Pull requests"
+      }
+    }
+  },
+  "act_pageChange_hostOnly": {
+    "message": "Agora em $HOST$",
+    "placeholders": {
+      "host": {
+        "content": "$1",
+        "example": "github.com"
+      }
+    }
+  },
+  "bg_overlay_nowOn": {
+    "message": "Agora em $HOST$",
+    "placeholders": {
+      "host": {
+        "content": "$1",
+        "example": "github.com"
+      }
+    }
+  },
+  "bg_overlay_opening": {
+    "message": "Abrindo $HOST$",
+    "placeholders": {
+      "host": {
+        "content": "$1",
+        "example": "github.com"
+      }
+    }
+  },
+  "bg_overlay_goingBack": {
+    "message": "Voltando para a página anterior"
+  },
+  "bg_overlay_goingForward": {
+    "message": "Avançando para a próxima página"
+  },
+  "bg_overlay_reloading": {
+    "message": "Recarregando a página"
+  },
+  "bg_overlay_leaving": {
+    "message": "Abrindo a próxima página"
+  },
+  "chat_skills_picker_label": {
+    "message": "Skills"
+  },
+  "chat_skills_picker_empty": {
+    "message": "Nenhuma skill começa com /$QUERY$",
+    "placeholders": {
+      "query": {
+        "content": "$1",
+        "example": "pri"
+      }
+    }
+  },
+  "chat_skills_picker_hint": {
+    "message": "↑↓ para escolher · Enter para usar · Esc para fechar"
+  },
+  "chat_skills_picker_manage": {
+    "message": "Gerenciar skills"
+  },
+  "chat_skills_selected": {
+    "message": "Esta tarefa vai seguir a skill $NAME$.",
+    "placeholders": {
+      "name": {
+        "content": "$1",
+        "example": "web-research"
+      }
+    }
+  },
+  "chat_skills_disabled": {
+    "message": "A skill /$NAME$ está desativada. Ative-a em Configurações, Skills, ou digite / para escolher outra.",
+    "placeholders": {
+      "name": {
+        "content": "$1",
+        "example": "web-research"
+      }
+    }
+  },
+  "chat_skills_unknown": {
+    "message": "Não existe skill ou comando chamado /$NAME$. Digite / para ver suas skills.",
+    "placeholders": {
+      "name": {
+        "content": "$1",
+        "example": "price-wach"
+      }
+    }
+  },
+  "options_tabs_skills": {
+    "message": "Skills"
+  },
+  "options_skills_header": {
+    "message": "Skills"
+  },
+  "options_skills_desc": {
+    "message": "Skills são roteiros reutilizáveis para um tipo de tarefa. O Flowkite carrega a skill certa quando a tarefa combina, ou você escolhe uma digitando / e o nome dela no chat. Suas skills ficam salvas apenas neste navegador."
+  },
+  "options_skills_builtin": {
+    "message": "Skills incluídas"
+  },
+  "options_skills_builtin_note": {
+    "message": "Skills incluídas podem ser desativadas, mas não editadas. Duplique uma para criar a sua versão."
+  },
+  "options_skills_custom": {
+    "message": "Suas skills"
+  },
+  "options_skills_custom_empty": {
+    "message": "Você ainda não tem skills próprias. Crie uma em Nova skill, importe um arquivo SKILL.md ou duplique uma skill incluída e ajuste."
+  },
+  "options_skills_new": {
+    "message": "Nova skill"
+  },
+  "options_skills_import": {
+    "message": "Importar SKILL.md"
+  },
+  "options_skills_import_failed": {
+    "message": "$FILE$ não tem instruções para importar.",
+    "placeholders": {
+      "file": {
+        "content": "$1",
+        "example": "notes.md"
+      }
+    }
+  },
+  "options_skills_import_review": {
+    "message": "Importada. Confira a skill abaixo e depois salve."
+  },
+  "options_skills_enable": {
+    "message": "Usar esta skill"
+  },
+  "options_skills_showSteps": {
+    "message": "Mostrar passos"
+  },
+  "options_skills_hideSteps": {
+    "message": "Ocultar passos"
+  },
+  "options_skills_duplicate": {
+    "message": "Duplicar"
+  },
+  "options_skills_edit": {
+    "message": "Editar"
+  },
+  "options_skills_delete": {
+    "message": "Excluir"
+  },
+  "options_skills_export": {
+    "message": "Exportar"
+  },
+  "options_skills_usage": {
+    "message": "Usada $COUNT$ vezes, a última em $DATE$",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "3"
+      },
+      "date": {
+        "content": "$2",
+        "example": "19/10/2026"
+      }
+    }
+  },
+  "options_skills_neverUsed": {
+    "message": "Ainda não usada"
+  },
+  "options_skills_form_new": {
+    "message": "Nova skill"
+  },
+  "options_skills_form_edit": {
+    "message": "Editar skill"
+  },
+  "options_skills_name": {
+    "message": "Nome"
+  },
+  "options_skills_name_placeholder": {
+    "message": "ex.: monitor-de-preco"
+  },
+  "options_skills_call": {
+    "message": "Chame no chat com /$NAME$",
+    "placeholders": {
+      "name": {
+        "content": "$1",
+        "example": "price-watch"
+      }
+    }
+  },
+  "options_skills_renamed": {
+    "message": "/$WANTED$ já existe, então será salva como /$NAME$.",
+    "placeholders": {
+      "wanted": {
+        "content": "$1",
+        "example": "web-research"
+      },
+      "name": {
+        "content": "$2",
+        "example": "web-research-2"
+      }
+    }
+  },
+  "options_skills_description": {
+    "message": "Quando usar"
+  },
+  "options_skills_description_placeholder": {
+    "message": "Use quando ... Uma frase. O Flowkite lê isto para decidir quando a skill se aplica."
+  },
+  "options_skills_instructions": {
+    "message": "Passos"
+  },
+  "options_skills_instructions_placeholder": {
+    "message": "Escreva o procedimento passo a passo, como explicaria para um colega novo."
+  },
+  "options_skills_count": {
+    "message": "$COUNT$ de $MAX$ caracteres",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "1200"
+      },
+      "max": {
+        "content": "$2",
+        "example": "8000"
+      }
+    }
+  },
+  "options_skills_save": {
+    "message": "Salvar skill"
+  },
+  "options_skills_cancel": {
+    "message": "Cancelar"
+  },
+  "options_skills_saved": {
+    "message": "Salva como /$NAME$.",
+    "placeholders": {
+      "name": {
+        "content": "$1",
+        "example": "price-watch"
+      }
+    }
+  },
+  "options_skills_full": {
+    "message": "Sua biblioteca está cheia ($MAX$ skills). Exclua uma que não usa mais para adicionar outra.",
+    "placeholders": {
+      "max": {
+        "content": "$1",
+        "example": "50"
+      }
+    }
+  },
+  "options_skills_builtin_webResearch_title": {
+    "message": "Pesquisa na web"
+  },
+  "options_skills_builtin_webResearch_desc": {
+    "message": "Responde uma pergunta com várias fontes, conferidas entre si, com links."
+  },
+  "options_skills_builtin_compareOptions_title": {
+    "message": "Comparar opções"
+  },
+  "options_skills_builtin_compareOptions_desc": {
+    "message": "Compara produtos, preços ou planos entre lojas e recomenda um."
+  },
+  "options_skills_builtin_collectList_title": {
+    "message": "Coletar uma lista"
+  },
+  "options_skills_builtin_collectList_desc": {
+    "message": "Junta muitos itens em uma tabela que você pode baixar como CSV."
+  },
+  "options_skills_builtin_fillForm_title": {
+    "message": "Preencher formulário"
+  },
+  "options_skills_builtin_fillForm_desc": {
+    "message": "Preenche formulários com cuidado e para antes de qualquer coisa irreversível."
+  },
+  "options_skills_builtin_summarizePage_title": {
+    "message": "Resumir uma página"
+  },
+  "options_skills_builtin_summarizePage_desc": {
+    "message": "Transforma a página, artigo ou conversa atual nos pontos principais."
+  },
+  "options_skills_builtin_inboxAssistant_title": {
+    "message": "Assistente de e-mail"
+  },
+  "options_skills_builtin_inboxAssistant_desc": {
+    "message": "Lê, organiza e rascunha e-mails no Gmail ou Outlook, e nunca envia sozinho."
+  },
+  "options_skills_builtin_travelSearch_title": {
+    "message": "Busca de viagem"
+  },
+  "options_skills_builtin_travelSearch_desc": {
+    "message": "Encontra e compara voos, trens e hospedagens, sem reservar nada."
+  },
+  "options_skills_builtin_checkStatus_title": {
+    "message": "Verificar status"
+  },
+  "options_skills_builtin_checkStatus_desc": {
+    "message": "Verifica um preço, estoque ou status contra a sua condição. Ótimo para agendamentos."
   }
 }

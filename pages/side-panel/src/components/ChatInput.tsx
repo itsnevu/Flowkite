@@ -8,11 +8,14 @@ import {
   MAX_UPLOAD_FILE_BYTES,
   MAX_UPLOAD_FILES,
   isImageUpload,
+  skillStore,
+  parseSkillInvocation,
 } from '@extension/storage';
 import { findPlaceholders, nextPlaceholder } from '../templates';
+import { builtinSkillCopy, matchSkills, slashQuery } from '../skillCopy';
 import { droppedImageUrl, readDroppedImage } from '../attachmentTransfer';
 import ApprovalModePicker from './ApprovalModePicker';
-import type { ApprovalMode, PendingUpload } from '@extension/storage';
+import type { ApprovalMode, PendingUpload, Skill } from '@extension/storage';
 import type { PlaceholderSpan } from '../templates';
 
 interface ChatInputProps {
@@ -123,6 +126,35 @@ export default function ChatInput({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  /**
+   * The skill picker: typing `/` at the start of an empty draft lists the enabled skills, filtered as
+   * the name is typed. Live from storage, so a skill switched on in Settings shows up without
+   * reopening the panel. Hidden while a task runs: a mid-run message is a correction, and a skill
+   * can only shape a task from its start.
+   */
+  const [skills, setSkills] = useState<Skill[]>([]);
+  const [pickerIndex, setPickerIndex] = useState(0);
+  /** The draft the user dismissed the picker on with Esc; typing anything else brings it back. */
+  const [pickerDismissedAt, setPickerDismissedAt] = useState<string | null>(null);
+  useEffect(() => {
+    const load = () =>
+      skillStore
+        .getEnabled()
+        .then(setSkills)
+        .catch(() => setSkills([]));
+    void load();
+    return skillStore.subscribe(() => void load());
+  }, []);
+  const skillQuery = showStopButton || inputDisabled ? null : slashQuery(text);
+  const pickerOpen = skillQuery !== null && pickerDismissedAt !== text;
+  const pickerItems = useMemo(() => (skillQuery === null ? [] : matchSkills(skills, skillQuery)), [skills, skillQuery]);
+  useEffect(() => setPickerIndex(0), [skillQuery]);
+  /** The skill this draft will run with, for the one-line confirmation under the composer. */
+  const chosenSkill = useMemo(() => {
+    const invocation = parseSkillInvocation(text);
+    return invocation ? (skills.find(skill => skill.name === invocation.name) ?? null) : null;
+  }, [text, skills]);
+
   // Handle text changes and resize textarea
   const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     draftVersion.current += 1;
@@ -168,6 +200,18 @@ export default function ChatInput({
         textarea.setSelectionRange(newText.length, newText.length);
       }
     });
+  }, []);
+
+  const pickSkill = useCallback(
+    (name: string) => {
+      setPickerDismissedAt(null);
+      applyExternalText(`/${name} `);
+    },
+    [applyExternalText],
+  );
+
+  const openSkillSettings = useCallback(() => {
+    void chrome.tabs.create({ url: chrome.runtime.getURL('options/index.html#skills') });
   }, []);
 
   // Expose a method to set content from outside
@@ -277,6 +321,27 @@ export default function ChatInput({
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
+      // The picker owns the arrow keys, Enter and Tab while it has something to offer; Esc closes it
+      // for this draft. With no match, Enter falls through and sends, and the panel explains.
+      if (pickerOpen && pickerItems.length > 0 && !e.nativeEvent.isComposing) {
+        if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+          e.preventDefault();
+          const step = e.key === 'ArrowDown' ? 1 : -1;
+          setPickerIndex(index => (index + step + pickerItems.length) % pickerItems.length);
+          return;
+        }
+        if ((e.key === 'Enter' && !e.shiftKey) || (e.key === 'Tab' && !e.shiftKey)) {
+          e.preventDefault();
+          pickSkill(pickerItems[Math.min(pickerIndex, pickerItems.length - 1)].name);
+          return;
+        }
+      }
+      if (pickerOpen && e.key === 'Escape') {
+        e.preventDefault();
+        setPickerDismissedAt(text);
+        return;
+      }
+
       if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
         e.preventDefault();
         handleSubmit(e);
@@ -296,7 +361,7 @@ export default function ChatInput({
         }
       }
     },
-    [handleSubmit, placeholders, text, selectSpan],
+    [handleSubmit, placeholders, text, selectSpan, pickerOpen, pickerItems, pickerIndex, pickSkill],
   );
 
   const handleReplay = useCallback(() => {
@@ -491,8 +556,66 @@ export default function ChatInput({
             </div>
           )}
 
+          {pickerOpen && (
+            <div className="animate-rise rounded-soft bg-canvas-raised p-1.5 shadow-neu-sm">
+              <div
+                id="flowkite-skill-picker"
+                role="listbox"
+                aria-label={t('chat_skills_picker_label')}
+                className="max-h-52 space-y-0.5 overflow-y-auto">
+                {pickerItems.length === 0 ? (
+                  <p className="px-2.5 py-1.5 text-xs text-ink-faint">
+                    {t('chat_skills_picker_empty', [skillQuery ?? ''])}
+                  </p>
+                ) : (
+                  pickerItems.map((skill, index) => {
+                    const copy = builtinSkillCopy(skill.name);
+                    const active = index === pickerIndex;
+                    return (
+                      <button
+                        key={skill.id}
+                        id={`flowkite-skill-${skill.name}`}
+                        type="button"
+                        role="option"
+                        aria-selected={active}
+                        // Keeps focus in the textarea, so the keyboard flow is never broken by a click.
+                        onMouseDown={e => e.preventDefault()}
+                        onMouseEnter={() => setPickerIndex(index)}
+                        onClick={() => pickSkill(skill.name)}
+                        className={`flex w-full flex-col items-start gap-0.5 rounded-soft px-2.5 py-1.5 text-left transition-shadow duration-150 ease-press ${
+                          active ? 'bg-canvas-sunk shadow-neu-inset-sm' : ''
+                        }`}>
+                        <span className="flex w-full min-w-0 items-baseline gap-2">
+                          <span className="shrink-0 font-mono text-xs font-medium text-ink">/{skill.name}</span>
+                          {copy && <span className="truncate text-[11px] text-ink-soft">{copy.title}</span>}
+                        </span>
+                        <span className="line-clamp-1 text-[11px] text-ink-faint">
+                          {copy?.summary ?? skill.description}
+                        </span>
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+              <div className="mt-1 flex items-center justify-between gap-2 px-2.5 pt-1">
+                <span className="truncate text-[10px] text-ink-faint">{t('chat_skills_picker_hint')}</span>
+                <button
+                  type="button"
+                  onMouseDown={e => e.preventDefault()}
+                  onClick={openSkillSettings}
+                  className="shrink-0 text-[10px] font-medium text-ink-soft transition-colors duration-150 ease-press hover:text-ink">
+                  {t('chat_skills_picker_manage')}
+                </button>
+              </div>
+            </div>
+          )}
+
           <textarea
             ref={textareaRef}
+            aria-controls={pickerOpen ? 'flowkite-skill-picker' : undefined}
+            aria-activedescendant={
+              pickerOpen && pickerItems[pickerIndex] ? `flowkite-skill-${pickerItems[pickerIndex].name}` : undefined
+            }
             value={text}
             onChange={handleTextChange}
             onKeyDown={handleKeyDown}
@@ -518,6 +641,13 @@ export default function ChatInput({
                 ? t('chat_input_steerHint')
                 : t('chat_attach_hint')}
           </p>
+
+          {/* Says which playbook the task will follow, so `/name` is visibly more than text. */}
+          {chosenSkill && !pickerOpen && !showStopButton && (
+            <p className="px-1.5 text-[10px] leading-tight text-ink-soft" role="note">
+              {t('chat_skills_selected', [chosenSkill.name])}
+            </p>
+          )}
 
           {/* Visible exactly while send is held for unfilled slots, so the hold explains itself. */}
           {placeholders.length > 0 && (

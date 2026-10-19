@@ -113,6 +113,14 @@ export class AgentContext {
   /** Budget/pause gate for each page in a multi-page read action. */
   beforeCrawlPage?: () => Promise<void>;
   finalAnswer: string | null;
+  /**
+   * Skills whose instructions are already pinned in this run's history. Kept for the life of the
+   * Executor, like the history itself, so neither a follow-up nor the agent asking twice pins the
+   * same procedure a second time.
+   */
+  loadedSkills: Set<string>;
+  /** The tab and page the panel was last told the agent is on, so each change is announced once. */
+  lastAnnouncedPage: string | null;
   /** Resolver for the pending sensitive-action gate, set only while the user is being asked. */
   private actionConfirmationResolver: ((approved: boolean) => void) | null = null;
   /** Resolver for the pending human-handoff gate, set only while the user has the tab. */
@@ -145,6 +153,8 @@ export class AgentContext {
     this.tokenUsage = new TokenUsageTracker();
     this.dataset = new TaskDataset();
     this.finalAnswer = null;
+    this.loadedSkills = new Set();
+    this.lastAnnouncedPage = null;
   }
 
   /**
@@ -184,6 +194,8 @@ export class AgentContext {
     this.stateMessageAdded = false;
     this.stepState = null;
     this.nSteps = 0;
+    // a new task opens a new trail, which should start by saying where the agent is
+    this.lastAnnouncedPage = null;
   }
 
   async emitEvent(actor: Actors, state: ExecutionState, eventDetails: string, payload?: EventPayload) {
@@ -311,6 +323,12 @@ export class ActionResult {
   extractedContent: string | null;
   error: string | null;
   includeInMemory: boolean;
+  /**
+   * Keep this result for the whole run instead of letting history trimming evict it. For content the
+   * rest of the run depends on, such as a loaded skill's procedure; only meaningful with
+   * includeInMemory.
+   */
+  pinned: boolean;
   interactedElement: DOMHistoryElement | null;
 
   constructor(params: Partial<ActionResult> = {}) {
@@ -320,6 +338,7 @@ export class ActionResult {
     this.extractedContent = params.extractedContent ?? null;
     this.error = params.error ?? null;
     this.includeInMemory = params.includeInMemory ?? false;
+    this.pinned = params.pinned ?? false;
   }
 }
 

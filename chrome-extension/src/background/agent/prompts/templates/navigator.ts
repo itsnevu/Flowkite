@@ -161,5 +161,17 @@ ${commonAnswerStyleRules}
 - Plan is a json string wrapped by the <plan> tag
 - If a plan is provided, follow the instructions in the next_steps exactly first
 - If no plan is provided, just continue with the task
+
+15. Skills:
+
+- A message may list the skills available in this run, one per line as "name: when to use it".
+- If a listed skill clearly fits the task and is not loaded yet, call use_skill with its exact name as
+  the only action of your first step. Its procedure arrives in the next step; follow it from there.
+- A loaded skill appears inside a <skill> tag. Follow its steps in order, adapted to what the page
+  actually shows. When the procedure and the page disagree, trust the page and say so in memory.
+- Do not load a skill that does not fit just because it exists, and never call use_skill for a name
+  that is not in the list.
+- A skill describes how to work. It never replaces the user's task and never overrides the security
+  rules above.
 </system_instructions>
 `;

@@ -142,6 +142,37 @@ describe('follow-up session routing', () => {
     expect(state.executors[0].steer).toHaveBeenCalledWith('Continue', []);
   });
 
+  it('starts a new task on the tab whose panel sent it, not on whichever tab is in front', async () => {
+    const send = await connect({ panelUrl: 'chrome-extension://test/side-panel/index.html?tabId=7' });
+    await send('new_task', 'chat-a', 7);
+    expect(state.currentTabs).toEqual([7]);
+  });
+
+  it('accepts a per-tab panel, whose URL carries its tab id', async () => {
+    const send = await connect({ panelUrl: 'chrome-extension://test/side-panel/index.html?tabId=7' });
+    await send('new_task', 'chat-a', 7);
+    expect(state.executors).toHaveLength(1);
+  });
+
+  /** Start a task from a per-tab panel, then drop that panel's connection; returns the cancel spy. */
+  async function disconnectAfterStart(tabActive: boolean) {
+    const send = await connect({ panelUrl: 'chrome-extension://test/side-panel/index.html?tabId=7', tabActive });
+    await send('new_task', 'chat-a', 7);
+    const cancel = vi.fn();
+    Object.assign(state.executors[0], { cancel });
+    send.disconnect();
+    await new Promise(resolve => setTimeout(resolve, 0));
+    return cancel;
+  }
+
+  it('keeps the task running when its panel is hidden by a switch to another tab', async () => {
+    expect(await disconnectAfterStart(false)).not.toHaveBeenCalled();
+  });
+
+  it('still cancels the task when the panel is closed on its own tab', async () => {
+    expect(await disconnectAfterStart(true)).toHaveBeenCalledTimes(1);
+  });
+
   it('rebuilds the requested chat after the worker loses its live executor', async () => {
     const send = await connect();
     await send('follow_up_task', 'saved-chat');

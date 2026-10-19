@@ -119,8 +119,82 @@ function readApprovalMode(value: unknown): ApprovalMode | undefined {
   return isApprovalMode(value) ? value : undefined;
 }
 
-// Setup side panel behavior
-chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(error => console.error(error));
+/** Make `port` the panel that receives run events, telling the one it replaces. */
+function adoptPanelPort(port: chrome.runtime.Port): void {
+  if (currentPort === port) return;
+  // Disconnecting makes that panel show a dropped connection instead of a live-looking transcript
+  // that no longer receives anything. Calling disconnect() here does not fire this context's own
+  // onDisconnect listener, so the handover cannot cancel a running task by accident.
+  if (currentPort) {
+    try {
+      currentPort.disconnect();
+    } catch {
+      // it was already gone
+    }
+  }
+  currentPort = port;
+}
+
+/** The tab a panel was opened for, from the `?tabId=` in its URL; null for a window-wide panel. */
+function panelTabIdOf(url: string | undefined): number | null {
+  if (!url) return null;
+  const id = Number(new URL(url).searchParams.get('tabId'));
+  return Number.isInteger(id) && id > 0 ? id : null;
+}
+
+/**
+ * Whether a panel that disconnected was closed, as opposed to hidden by a switch to another tab.
+ *
+ * A per-tab panel's tab is no longer the active one when it was hidden by a tab switch; when the
+ * user closes the panel, they are looking at its tab. A panel without a tab of its own, or whose
+ * tab is gone, counts as closed, which is what a disconnect always meant before.
+ */
+async function panelWasClosed(url: string | undefined): Promise<boolean> {
+  const tabId = panelTabIdOf(url);
+  if (tabId === null) return true;
+  try {
+    return (await chrome.tabs.get(tabId)).active;
+  } catch {
+    return true;
+  }
+}
+
+/**
+ * One tab, one Flowkite.
+ *
+ * The panel used to be registered for the whole window, so it stayed open on every tab the user
+ * switched to and always drove whichever tab happened to be in front. Now each panel belongs to the
+ * tab it was opened on: the default panel is switched off, and opening Flowkite enables a panel for
+ * that tab alone, with the tab id in its URL so the panel knows which tab is its own. Switching to
+ * another tab hides it; switching back brings the same conversation back.
+ */
+function panelPathFor(tabId: number): string {
+  return `side-panel/index.html?tabId=${tabId}`;
+}
+
+/**
+ * Open Flowkite on one tab, from a user gesture (toolbar click, shortcut, context menu, notification).
+ *
+ * setOptions is deliberately not awaited before open(): sidePanel.open() must run inside the
+ * gesture, and an await in between can let the gesture lapse. The calls are queued in order, so the
+ * panel still opens with this tab's path.
+ */
+function openPanelForTab(tabId: number): Promise<void> {
+  chrome.sidePanel
+    .setOptions({ tabId, path: panelPathFor(tabId), enabled: true })
+    .catch(error => logger.error('Failed to enable the panel for tab', tabId, error));
+  return chrome.sidePanel.open({ tabId });
+}
+
+// The toolbar button opens the panel through openPanelForTab rather than Chrome's built-in
+// behaviour, which would open the window-wide default panel.
+chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: false }).catch(error => console.error(error));
+// No panel on tabs Flowkite was not opened on. Tab-specific options override this default.
+chrome.sidePanel.setOptions({ enabled: false }).catch(error => console.error(error));
+chrome.action.onClicked.addListener(tab => {
+  if (tab.id === undefined) return;
+  openPanelForTab(tab.id).catch(error => logger.error('Failed to open the side panel:', error));
+});
 
 /**
  * Keyboard shortcut for the panel.
@@ -133,8 +207,8 @@ chrome.commands?.onCommand.addListener(async command => {
   if (command !== 'open-side-panel') return;
   try {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    if (tab?.windowId === undefined) return;
-    await chrome.sidePanel?.open({ windowId: tab.windowId });
+    if (tab?.id === undefined) return;
+    await openPanelForTab(tab.id);
   } catch (error) {
     logger.error('Failed to open the side panel from the keyboard shortcut', error);
   }
@@ -196,12 +270,12 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
   // port message would cover neither reliably - the panel only connects once a task runs.
   // storage.session is TRUSTED_CONTEXTS-only, so no web page can plant a prefill here.
   chrome.storage.session
-    .set({ pendingPrefill: { text, ts: Date.now() } })
+    .set({ pendingPrefill: { text, ts: Date.now(), tabId: tab.id } })
     .catch(error => logger.error('Failed to stash context-menu prefill:', error));
 
-  // Must be called synchronously enough to keep the user gesture; .open() with tabId focuses the
-  // panel on the tab the user right-clicked.
-  chrome.sidePanel.open({ tabId: tab.id }).catch(error => logger.error('Failed to open side panel:', error));
+  // Must be called synchronously enough to keep the user gesture; the panel opens on, and belongs
+  // to, the tab the user right-clicked.
+  openPanelForTab(tab.id).catch(error => logger.error('Failed to open side panel:', error));
 });
 
 chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
@@ -275,27 +349,24 @@ chrome.runtime.onConnect.addListener(port => {
     const senderUrl = port.sender?.url;
     const senderId = port.sender?.id;
 
-    if (!senderUrl || senderId !== chrome.runtime.id || senderUrl !== SIDE_PANEL_URL) {
+    // Compared without the query string: each tab's panel carries its own `?tabId=`.
+    if (!senderUrl || senderId !== chrome.runtime.id || senderUrl.split('?')[0] !== SIDE_PANEL_URL) {
       logger.warning('Blocked unauthorized side-panel-connection', senderId, senderUrl);
       port.disconnect();
       return;
     }
 
-    // One panel at a time. Taking the slot must also tell the panel that held it - disconnecting
-    // it makes that panel show a dropped connection instead of a live-looking transcript that no
-    // longer receives anything. Calling disconnect() here does not fire this context's own
-    // onDisconnect listener, so the handover cannot cancel a running task by accident.
-    if (currentPort && currentPort !== port) {
-      try {
-        currentPort.disconnect();
-      } catch {
-        // it was already gone
-      }
+    // With a panel per tab, more than one can be connected. While a task one panel started is
+    // running, that panel keeps the event stream: another tab's panel connecting must not cut it
+    // off mid-run (it can still send, and is told the run slot is busy). Otherwise the newest panel
+    // takes over as before.
+    const panelTaskRunning = executorBusy && currentTaskMeta?.source === 'manual' && currentPort !== null;
+    if (!panelTaskRunning) {
+      adoptPanelPort(port);
+      // a new panel has launched nothing yet; without this reset, outcomes of a task an earlier
+      // panel started would be skipped by persistOutcomeWithoutPanel and written by nobody
+      currentPanelTaskId = null;
     }
-    currentPort = port;
-    // a new panel has launched nothing yet; without this reset, outcomes of a task an earlier
-    // panel started would be skipped by persistOutcomeWithoutPanel and written by nobody
-    currentPanelTaskId = null;
 
     port.onMessage.addListener(async message => {
       try {
@@ -313,6 +384,8 @@ chrome.runtime.onConnect.addListener(port => {
             if (!claimRunSlot(message.taskId)) return port.postMessage({ type: 'error', error: t('bg_cmd_task_busy') });
 
             logger.info('new_task', message.tabId, message.task);
+            // The panel that starts a run is the one that hears it.
+            adoptPanelPort(port);
             try {
               const executor = await setupExecutor(
                 message.taskId,
@@ -328,6 +401,9 @@ chrome.runtime.onConnect.addListener(port => {
               currentTaskMeta = { source: 'manual', task: message.task, startedAt: Date.now(), chain: 0 };
               currentPanelTaskId = typeof message.taskId === 'string' ? message.taskId : null;
               subscribeToExecutorEvents(executor);
+              // A new task starts on the tab whose panel sent it, not on whatever tab is in front of
+              // the worker's notion of "current window". That is what makes one tab one Flowkite.
+              if (Number.isInteger(message.tabId)) browserContext.updateCurrentTabId(message.tabId);
 
               const result = await executor.execute();
               logger.info('new_task execution result', message.tabId, result);
@@ -358,6 +434,8 @@ chrome.runtime.onConnect.addListener(port => {
             if (!claimRunSlot(message.taskId)) return port.postMessage({ type: 'error', error: t('bg_cmd_task_busy') });
 
             logger.info('follow_up_task', message.tabId, message.task);
+            // The panel that starts a run is the one that hears it.
+            adoptPanelPort(port);
             try {
               if (currentExecutor && (await currentExecutor.getCurrentTaskId()) === message.taskId) {
                 const executor = currentExecutor;
@@ -390,6 +468,8 @@ chrome.runtime.onConnect.addListener(port => {
                 currentTaskMeta = { source: 'manual', task: message.task, startedAt: Date.now(), chain: 0 };
                 currentPanelTaskId = typeof message.taskId === 'string' ? message.taskId : null;
                 subscribeToExecutorEvents(executor);
+                // A fresh executor has no tab of its own yet; it starts where the panel lives.
+                if (Number.isInteger(message.tabId)) browserContext.updateCurrentTabId(message.tabId);
                 const result = await executor.execute();
                 logger.info('follow_up_task (fresh executor) execution result', message.tabId, result);
               }
@@ -548,6 +628,8 @@ chrome.runtime.onConnect.addListener(port => {
               return port.postMessage({ type: 'error', error: t('bg_cmd_replay_noHistory') });
             if (!claimRunSlot()) return port.postMessage({ type: 'error', error: t('bg_cmd_task_busy') });
             logger.info('replay', message.tabId, message.taskId, message.historySessionId);
+            // The panel that starts a run is the one that hears it.
+            adoptPanelPort(port);
 
             try {
               // Switch to the specified tab
@@ -599,9 +681,15 @@ chrome.runtime.onConnect.addListener(port => {
       if (currentPort !== port) return;
       currentPort = null;
       // Closing the panel abandons the task the panel started - and only that. A scheduled or
-      // webhook run has no panel to lose: it writes its own outcome and must keep running.
+      // webhook run has no panel to lose: it writes its own outcome and must keep running. Nor does
+      // a panel that went away because the user switched to another tab: a per-tab panel is hidden
+      // with its tab, and the task it started keeps going there.
       if (currentTaskMeta?.source === 'manual') {
-        currentExecutor?.cancel();
+        const executor = currentExecutor;
+        void panelWasClosed(port.sender?.url).then(closed => {
+          if (closed && executor === currentExecutor) executor?.cancel();
+          else if (!closed) logger.info('Panel hidden by a tab switch; the task keeps running');
+        });
       }
     });
   }
@@ -768,9 +856,9 @@ chrome.notifications.onClicked.addListener(notificationId => {
   chrome.notifications.clear(notificationId);
   // A notification click is a user gesture, which sidePanel.open requires; the result itself is
   // waiting in the panel's chat history.
-  chrome.windows.getLastFocused().then(window => {
-    if (window?.id !== undefined) {
-      chrome.sidePanel.open({ windowId: window.id }).catch(error => logger.error('Failed to open panel:', error));
+  chrome.tabs.query({ active: true, lastFocusedWindow: true }).then(([tab]) => {
+    if (tab?.id !== undefined) {
+      openPanelForTab(tab.id).catch(error => logger.error('Failed to open panel:', error));
     }
   });
 });

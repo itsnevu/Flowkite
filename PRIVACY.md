@@ -18,6 +18,7 @@ That covers:
 - **Conversation history** and saved prompts
 - **Settings**, including firewall allow and deny lists
 - **Remembered preferences** (see below)
+- **Skills** you write or import, and which built-in skills you switched off
 
 None of this is synced across your devices. It leaves your machine only as described in "What is sent to your LLM provider", "Voice input" and "Outbound webhook" below. The last two are off until you turn them on.
 
@@ -39,6 +40,7 @@ To do anything useful, Flowkite sends page context to whichever LLM provider **y
 - **Screenshots of the page**, when vision is enabled; automatically when the page cannot be read from the DOM at all; and on the step after one fails, even with vision off — a step usually fails because the text description of the page was not enough, so one screenshot is attached per retry until the failure budget runs out
 - Your task instructions and the conversation so far
 - Your remembered preferences, when memory is enabled
+- The name and one-line description of each skill you have enabled, and the full steps of a skill once it is used
 
 This data goes directly from your browser to your provider. It does not pass through any Flowkite infrastructure. **Once it reaches your provider, their privacy policy governs it, not this one.** If a page contains sensitive information and you run a task on it, that information may be included in what is sent.
 
@@ -115,6 +117,7 @@ Analytics data is processed by PostHog and used solely to improve the extension.
 ## Your control
 
 - Review and delete remembered preferences under **Options → Memory**
+- Review, switch off, edit, export or delete skills under **Options → Skills**
 - Clear conversation history at any time from the side panel
 - Enable or disable analytics under **Options → Analytics**
 - Restrict which sites the agent may touch under **Options → Firewall**

@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { HumanMessage } from '@langchain/core/messages';
 import { Actors, ExecutionState } from '../event/types';
 import { filterExternalContent } from '../messages/utils';
+import { toPlainText } from '../plainText';
 import {
   ChatModelAuthError,
   ChatModelBadRequestError,
@@ -88,7 +89,9 @@ export class PlannerAgent extends BaseAgent<typeof plannerOutputSchema, PlannerO
 
       // clean the model output
       const observation = filterExternalContent(modelOutput.observation);
-      const final_answer = filterExternalContent(modelOutput.final_answer);
+      // Plain text is enforced here rather than trusted to the prompt: some providers bold and bullet
+      // whatever the style rules say, and this is the text the user reads, copies and gets notified with.
+      const final_answer = toPlainText(filterExternalContent(modelOutput.final_answer));
       const next_steps = filterExternalContent(modelOutput.next_steps);
       const challenges = filterExternalContent(modelOutput.challenges);
       const reasoning = filterExternalContent(modelOutput.reasoning);
@@ -103,7 +106,8 @@ export class PlannerAgent extends BaseAgent<typeof plannerOutputSchema, PlannerO
       };
 
       // If task is done, emit the final answer; otherwise emit next steps
-      const eventMessage = cleanedPlan.done ? cleanedPlan.final_answer : cleanedPlan.next_steps;
+      // next_steps stays as written for the navigator; only the copy shown in the panel is cleaned.
+      const eventMessage = cleanedPlan.done ? cleanedPlan.final_answer : toPlainText(cleanedPlan.next_steps);
       this.context.emitEvent(Actors.PLANNER, ExecutionState.STEP_OK, eventMessage);
       logger.info('Planner output', JSON.stringify(cleanedPlan, null, 2));
 

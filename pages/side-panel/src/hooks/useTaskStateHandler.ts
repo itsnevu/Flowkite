@@ -307,6 +307,12 @@ export const useTaskStateHandler = ({
               status = content || null;
               trailKind = 'error';
               break;
+            case ExecutionState.PAGE_CHANGE:
+              // Where the agent is now. On the status line so a page change is announced the moment
+              // it is noticed, and in the trail so a long run reads as a route, not a list of clicks.
+              status = content || null;
+              trailKind = 'page';
+              break;
             default:
               console.error('Invalid action', state);
               return;

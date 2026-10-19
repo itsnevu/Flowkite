@@ -7,7 +7,8 @@ export enum Actors {
 }
 
 /** How one trail entry reads: a step that worked, one that did not, or plain narration. */
-export type TrailKind = 'ok' | 'error' | 'note';
+/** `page` marks the agent arriving on a new page or tab, so a long trail shows where it went. */
+export type TrailKind = 'ok' | 'error' | 'note' | 'page';
 
 /**
  * One line of the step-by-step trail a task leaves behind.

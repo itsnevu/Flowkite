@@ -227,6 +227,8 @@ export const SILENT_ACTION_NAMES: ReadonlySet<string> = new Set([
   'done',
   'cache_content',
   'remember',
+  // loads a procedure from the user's own skill library; nothing reaches the page
+  'use_skill',
   'wait',
   'scroll_to_percent',
   'scroll_to_top',

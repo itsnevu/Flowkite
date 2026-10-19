@@ -3,6 +3,8 @@ import { createLogger } from '@src/background/log';
 import { chatHistoryStore } from '@extension/storage/lib/chat';
 import {
   memoryStore,
+  skillStore,
+  parseSkillInvocation,
   observedModelsStore,
   requiresPlanApproval,
   skipsPeriodicPlanning,
@@ -18,6 +20,8 @@ import { PlannerAgent, type PlannerOutput } from './agents/planner';
 import { NavigatorPrompt } from './prompts/navigator';
 import { PlannerPrompt } from './prompts/planner';
 import MessageManager, { MessageManagerSettings } from './messages/service';
+import { filterExternalContent } from './messages/utils';
+import { formatSkillCatalog, formatSkillInstructions } from './skills';
 import { OUTPUT_TOKEN_CAP } from './helper';
 import { ActionBuilder } from './actions/builder';
 import { EventManager } from './event/manager';
@@ -39,6 +43,9 @@ import type { ApprovalMode, PendingUpload, GeneralSettingsConfig, ModelPricingCo
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
 
 const logger = createLogger('Executor');
+
+/** Slash commands the side panel handles itself; everything else starting with a slash is a skill. */
+const PANEL_COMMAND = /^\/(replay|state|nohighlight)(\s|$)/;
 
 export interface ExecutorExtraArgs {
   images?: PendingUpload[];
@@ -92,6 +99,8 @@ export class Executor {
   private planApproved = false;
   /** Whether remembered preferences were already loaded for the task currently being worked on. */
   private memoriesInjected = false;
+  /** Whether the skills catalog is already in this Executor's history; it stays for every follow-up. */
+  private skillCatalogInjected = false;
   /** Whether previous session conversation history was already injected. */
   private sessionHistoryInjected = false;
   /** Price entries snapshotted at construction; empty means nothing is priced and the brake stays off. */
@@ -351,6 +360,7 @@ export class Executor {
       this.context.browserContext.startTaskGroup(this.tasks[this.tasks.length - 1]);
 
       await this.injectMemories();
+      await this.injectSkills();
       await this.injectSessionHistory();
 
       // Track task start
@@ -550,6 +560,51 @@ export class Executor {
   }
 
   /**
+   * Put the user's skills in front of the agent.
+   *
+   * Two things, both pinned against trimming. A task that starts with `/name` gets that skill's
+   * procedure loaded before the first step, because the user already chose it and making the agent
+   * spend a step rediscovering that choice is pure waste. And the first task of an Executor gets the
+   * catalog, one line per enabled skill, so the agent can load the right one itself with use_skill.
+   * Like memories, a failure here is never fatal: the task still runs, just without playbooks.
+   */
+  private async injectSkills(): Promise<void> {
+    try {
+      const skills = await skillStore.getEnabled();
+      if (skills.length === 0) return;
+
+      const invocation = parseSkillInvocation(this.tasks[this.tasks.length - 1] ?? '');
+      const invoked = invocation ? skills.find(skill => skill.name === invocation.name) : undefined;
+      if (invoked && !this.context.loadedSkills.has(invoked.name)) {
+        this.context.loadedSkills.add(invoked.name);
+        const procedure = formatSkillInstructions({
+          name: invoked.name,
+          instructions: filterExternalContent(invoked.instructions),
+        });
+        this.context.messageManager.addSkillInstructions(
+          `${procedure}\nThe user chose this skill by starting the task with /${invoked.name}. That prefix selects the skill; it is not part of what they asked for.`,
+        );
+        void skillStore.markUsed(invoked.name).catch(() => undefined);
+        // As the navigator's "about to" line: the panel shows it on the status line and in the trail,
+        // and the page banner says it too. A system STEP_OK would be dropped by the panel.
+        this.context.emitEvent(Actors.NAVIGATOR, ExecutionState.ACT_START, t('exec_skill_applied', [invoked.name]));
+        logger.info(`🧩 Skill loaded by invocation: ${invoked.name}`);
+      }
+
+      if (!this.skillCatalogInjected) {
+        this.skillCatalogInjected = true;
+        this.context.messageManager.addSkillCatalog(
+          formatSkillCatalog(
+            skills.map(skill => ({ name: skill.name, description: filterExternalContent(skill.description) })),
+          ),
+        );
+      }
+    } catch (error) {
+      logger.error(`Failed to load skills, continuing without them: ${error}`);
+    }
+  }
+
+  /**
    * Load previous conversation exchanges from this chat session into the task's context window.
    *
    * Limits to the most recent 20 exchanges to maintain performance while preserving relevant
@@ -589,7 +644,9 @@ export class Executor {
       }
       const previousMessages = messages.filter(msg => {
         const content = msg.content.trim();
-        if (!content || (msg.actor === Actors.USER && content.startsWith('/'))) return false;
+        // Panel commands (/replay, /state, /nohighlight) are not turns. A `/skill-name ...` prompt is:
+        // it is the user's request with a playbook chosen, and dropping it lost the whole turn.
+        if (!content || (msg.actor === Actors.USER && PANEL_COMMAND.test(content))) return false;
         return (
           msg.actor === Actors.USER ||
           msg.actor === Actors.SYSTEM ||

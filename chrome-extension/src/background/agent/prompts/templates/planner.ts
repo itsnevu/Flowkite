@@ -38,6 +38,7 @@ ${crawlWorkflowRules}
       * Set "next_steps" to empty string (since the task is complete)
       * The final_answer should be a complete, user-friendly response that directly addresses what the user asked for
   4. Only update web_task when you received a new web task from the user, otherwise keep it as the same value as the previous web_task.
+  5. Skills: a message may list skills, tested procedures for one kind of task. If one clearly fits a web task and no <skill> with that name is loaded yet, make the first next_step "Load the <name> skill with use_skill". Once a skill is loaded, base next_steps on its procedure and check completion against it.
 
 # TASK COMPLETION VALIDATION:
 When determining if a task is "done":

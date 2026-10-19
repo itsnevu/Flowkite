@@ -33,18 +33,21 @@ export const commonSecurityRules = `
 // Style rules for the text the user actually reads: the planner's final_answer and the navigator's
 // done text. Kept model-agnostic on purpose - Flowkite runs on whatever provider the user configured,
 // and each one has its own default voice (headings and bold everywhere, metadata dumped as a bullet
-// list, a closing offer to do more). These rules pull all of them onto the same voice.
+// list, a closing offer to do more). These rules pull all of them onto the same voice: plain text, the
+// way a person types a message. agent/plainText.ts strips whatever markdown still slips through, so
+// these rules are about writing well without it, not the only line of defence.
 export const commonAnswerStyleRules = `
 # HOW TO WRITE THE ANSWER THE USER READS:
 
-## EMPHASIS - the panel renders these, so use them deliberately and sparingly:
-* **double asterisks** mark the one or two terms a sentence turns on. A sentence where half the
-  words are bold has emphasised nothing.
-* Backticks mark a literal the user has to read exactly: a value, a field name, a button label, a
-  url, a file name. Never wrap ordinary words in them.
-* A line starting with ## is a short section title, two or three words. Use one only when the answer
-  genuinely has several parts. A two-sentence answer never needs a title.
-* Lists start with "- ", or "1. " when the order matters.
+## PLAIN TEXT ONLY - the user reads markdown symbols as machine-written noise:
+* No markdown of any kind. No double asterisks or underscores for bold, no single asterisks for
+  italics, no # headings, no backticks, no > quotes, no --- rules, no tables.
+* Never start a line with "-", "*", "•" or "+". A list is simply one item per line.
+* Structure comes from line breaks. A short section title is a plain line of two to four words on its
+  own, with the items for that section on the lines under it, and a blank line before the next
+  section. A short answer needs no titles at all.
+* A line may start with "1." only for steps the user must follow in that exact order.
+* To show an order or flow inside a sentence, an arrow is fine: hero section → kategori → testimoni.
 
 ## HARD BANS - absolute, no task and no request overrides them:
 * NEVER use an em dash or en dash (—, –) anywhere in the answer. Use a comma, a colon, parentheses,
@@ -55,30 +58,42 @@ export const commonAnswerStyleRules = `
   want me to...", no "the search box is available if you want to refine". The answer ends at the
   last fact.
 * NEVER describe what you clicked, opened or searched, and never restate the task before answering.
-* NEVER put a title on every paragraph, and never bold a whole line to fake a title.
 
 ## WHAT TO SAY:
 * Write sentences, in the same language the user wrote their task in.
-* One or two results are a sentence, never a list. Use a list for three or more items that are
-  genuinely parallel, one short line each.
+* One or two results are a sentence, never a list. Use one-item-per-line only for three or more
+  items that are genuinely parallel, one short line each.
 * Say the facts the task asked for and the facts needed to act on them. Everything else - ids,
   timestamps, follower counts, section scaffolding - stays out unless the task turns on it.
 * If the user genuinely has to do something next, say that step in one sentence and stop.
 * Never invent a number, a url, a name or a date. Everything you state comes from what you read.
 
-## WORKED EXAMPLE:
-Wrong - scaffolding around nothing, then a closing offer:
+## WORKED EXAMPLES:
+Wrong - markdown scaffolding around nothing, then a closing offer:
   **Info Dasar:**
   - Username: itsnevu
   - Followers: 16 | Following: 10
-  - Repositories: 100
   **Pinned Projects:**
   1. **Godplan ERP** - Multi-tenant business platform (Go)
   Ada yang mau kamu ubah atau tambahkan di profile?
-Right - the same facts, emphasis on what the reader is looking for:
-  Profil **itsnevu** punya 100 repositori dan 16 follower, dengan **1.714 kontribusi** setahun
-  terakhir. Empat proyek yang dipin: Godplan ERP, CoinSight, Student Performance, dan Credential
-  Forgery Detection.
+Right - the same facts as plain sentences:
+  Profil itsnevu punya 100 repositori dan 16 follower, dengan 1.714 kontribusi setahun terakhir.
+  Empat proyek yang dipin: Godplan ERP, CoinSight, Student Performance, dan Credential Forgery
+  Detection.
+
+Right - a longer answer with sections, still plain text:
+  Berikut upgrade yang paling masuk akal untuk Beranda:
+
+  Prioritas tinggi
+  Perjelas headline dan subheadline
+  Gunakan satu CTA utama
+  Pastikan teks tetap terbaca di mobile
+
+  Section keunggulan
+  Kualitas produk
+  Pengiriman aman
+
+  Urutan terbaik berikutnya: hero section → kategori produk → testimoni → CTA akhir.
 `;
 
 // What Flowkite will and will not do, and how it says no. Separate from commonSecurityRules: those

@@ -1,5 +1,6 @@
-import { Actors, chatHistoryStore } from '@extension/storage';
+import { Actors, chatHistoryStore, parseSkillInvocation, skillStore } from '@extension/storage';
 import { t } from '@extension/i18n';
+import { resolveTaskTabId } from '../panelTab';
 import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
 import type { ApprovalMode, PendingUpload, Message } from '@extension/storage';
 import type { ActionConfirmationPayload, PlanReviewPayload } from '../types/event';
@@ -13,6 +14,22 @@ import type { LiveStatus } from '../types/status';
  * makes it a no-op, the catch never runs, and the card disappears as though the answer had been
  * delivered - so the user believes they approved a step that never resumed.
  */
+/** Slash commands this panel handles itself. Anything else that parses as `/name` may be a skill. */
+const PANEL_COMMANDS = new Set(['state', 'nohighlight', 'replay']);
+
+/**
+ * What a `/name ...` draft is: a skill to send as a task, a panel command, or a name that is neither.
+ * `disabled` and `unknown` are explained to the user with the draft kept, so a typo costs one edit.
+ */
+async function classifySlash(text: string): Promise<'skill' | 'command' | 'disabled' | 'unknown'> {
+  const invocation = parseSkillInvocation(text);
+  if (!invocation || PANEL_COMMANDS.has(invocation.name)) return 'command';
+  const all = await skillStore.getAll();
+  const skill = all.find(entry => entry.name === invocation.name);
+  if (!skill) return 'unknown';
+  return skill.enabled ? 'skill' : 'disabled';
+}
+
 const postToBackground = (port: chrome.runtime.Port | null, message: unknown): void => {
   if (!port) {
     throw new Error(t('errors_conn_serviceWorker'));
@@ -115,9 +132,8 @@ export const useTaskDispatch = ({
         return;
       }
 
-      // Get current tab ID
-      const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
-      const tabId = tabs[0]?.id;
+      // This panel's own tab, or the active one for a panel that was not opened for a tab
+      const tabId = await resolveTaskTabId();
       if (!tabId) {
         throw new Error('No active tab found');
       }
@@ -256,11 +272,27 @@ export const useTaskDispatch = ({
 
     if (!trimmedText) return false;
 
-    // Check if the input is a command (starts with /)
+    // Check if the input is a command (starts with /). `/skill-name ...` is not a command: it is a
+    // task with a playbook chosen, and goes on to the background like any other task.
     if (trimmedText.startsWith('/')) {
-      // Process command and return if it was handled
-      const wasHandled = await handleCommand(trimmedText);
-      if (wasHandled) return true;
+      const kind = await classifySlash(trimmedText).catch(() => 'command' as const);
+      if (kind === 'disabled' || kind === 'unknown') {
+        const name = parseSkillInvocation(trimmedText)?.name ?? '';
+        appendMessage(
+          {
+            actor: Actors.SYSTEM,
+            content: t(kind === 'disabled' ? 'chat_skills_disabled' : 'chat_skills_unknown', [name]),
+            timestamp: Date.now(),
+          },
+          null,
+        );
+        return false;
+      }
+      if (kind === 'command') {
+        // Process command and return if it was handled
+        const wasHandled = await handleCommand(trimmedText);
+        if (wasHandled) return true;
+      }
     }
 
     // A stored chat on screen while another task runs live: a send here can neither steer that
@@ -289,8 +321,8 @@ export const useTaskDispatch = ({
     }
 
     try {
-      const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
-      const tabId = tabs[0]?.id;
+      // The task runs on the tab this panel belongs to: one tab, one Flowkite.
+      const tabId = await resolveTaskTabId();
       if (!tabId) {
         throw new Error('No active tab found');
       }

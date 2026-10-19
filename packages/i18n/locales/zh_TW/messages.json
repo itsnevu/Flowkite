@@ -330,7 +330,7 @@
     "message": "發生錯誤"
   },
   "options_masthead_subtitle": {
-    "message": "本機多代理網頁自動化——調整代理、其上限與防護機制。"
+    "message": "本機多代理網頁自動化。調整代理、其上限與防護機制。"
   },
   "options_general_header": {
     "message": "一般"
@@ -2127,7 +2127,7 @@
     "message": "已達上限"
   },
   "chat_dataset_showing": {
-    "message": "顯示 $TOTAL$ 列中的 $SHOWN$ 列 — 下載即可取得全部。",
+    "message": "顯示 $TOTAL$ 列中的 $SHOWN$ 列，下載即可取得全部。",
     "placeholders": {
       "shown": {
         "content": "$1",
@@ -2367,5 +2367,358 @@
   },
   "act_crawl_result": {
     "message": "擷取進度：已讀取 $1 頁、收集 $2 筆、待處理 $3 個網址、失敗 $4 頁。"
+  },
+  "act_useSkill_start": {
+    "message": "正在載入 $NAME$ 技能",
+    "placeholders": {
+      "name": {
+        "content": "$1",
+        "example": "web-research"
+      }
+    }
+  },
+  "act_useSkill_ok": {
+    "message": "正在使用 $NAME$ 技能",
+    "placeholders": {
+      "name": {
+        "content": "$1",
+        "example": "web-research"
+      }
+    }
+  },
+  "act_useSkill_already": {
+    "message": "$NAME$ 技能已經載入",
+    "placeholders": {
+      "name": {
+        "content": "$1",
+        "example": "web-research"
+      }
+    }
+  },
+  "act_useSkill_notFound": {
+    "message": "沒有名為 $NAME$ 的已啟用技能。可用的技能：$AVAILABLE$",
+    "placeholders": {
+      "name": {
+        "content": "$1",
+        "example": "price-watch"
+      },
+      "available": {
+        "content": "$2",
+        "example": "web-research, fill-form"
+      }
+    }
+  },
+  "exec_skill_applied": {
+    "message": "正在使用你選擇的 $NAME$ 技能",
+    "placeholders": {
+      "name": {
+        "content": "$1",
+        "example": "web-research"
+      }
+    }
+  },
+  "act_pageChange": {
+    "message": "目前在 $HOST$：$TITLE$",
+    "placeholders": {
+      "host": {
+        "content": "$1",
+        "example": "github.com"
+      },
+      "title": {
+        "content": "$2",
+        "example": "Pull requests"
+      }
+    }
+  },
+  "act_pageChange_hostOnly": {
+    "message": "目前在 $HOST$",
+    "placeholders": {
+      "host": {
+        "content": "$1",
+        "example": "github.com"
+      }
+    }
+  },
+  "bg_overlay_nowOn": {
+    "message": "目前在 $HOST$",
+    "placeholders": {
+      "host": {
+        "content": "$1",
+        "example": "github.com"
+      }
+    }
+  },
+  "bg_overlay_opening": {
+    "message": "正在開啟 $HOST$",
+    "placeholders": {
+      "host": {
+        "content": "$1",
+        "example": "github.com"
+      }
+    }
+  },
+  "bg_overlay_goingBack": {
+    "message": "正在返回上一頁"
+  },
+  "bg_overlay_goingForward": {
+    "message": "正在前往下一頁"
+  },
+  "bg_overlay_reloading": {
+    "message": "正在重新載入頁面"
+  },
+  "bg_overlay_leaving": {
+    "message": "正在開啟下一個頁面"
+  },
+  "chat_skills_picker_label": {
+    "message": "技能"
+  },
+  "chat_skills_picker_empty": {
+    "message": "沒有以 /$QUERY$ 開頭的技能",
+    "placeholders": {
+      "query": {
+        "content": "$1",
+        "example": "pri"
+      }
+    }
+  },
+  "chat_skills_picker_hint": {
+    "message": "↑↓ 選擇 · Enter 使用 · Esc 關閉"
+  },
+  "chat_skills_picker_manage": {
+    "message": "管理技能"
+  },
+  "chat_skills_selected": {
+    "message": "這個任務會依照 $NAME$ 技能進行。",
+    "placeholders": {
+      "name": {
+        "content": "$1",
+        "example": "web-research"
+      }
+    }
+  },
+  "chat_skills_disabled": {
+    "message": "/$NAME$ 技能已關閉。請到「設定」的「技能」中開啟，或輸入 / 選擇其他技能。",
+    "placeholders": {
+      "name": {
+        "content": "$1",
+        "example": "web-research"
+      }
+    }
+  },
+  "chat_skills_unknown": {
+    "message": "沒有名為 /$NAME$ 的技能或指令。輸入 / 查看你的技能。",
+    "placeholders": {
+      "name": {
+        "content": "$1",
+        "example": "price-wach"
+      }
+    }
+  },
+  "options_tabs_skills": {
+    "message": "技能"
+  },
+  "options_skills_header": {
+    "message": "技能"
+  },
+  "options_skills_desc": {
+    "message": "技能是針對某類任務的可重複使用流程。任務符合時 Flowkite 會自動載入合適的技能，你也可以在聊天中輸入 / 加上技能名稱自行選擇。你的技能只會儲存在這個瀏覽器中。"
+  },
+  "options_skills_builtin": {
+    "message": "內建技能"
+  },
+  "options_skills_builtin_note": {
+    "message": "內建技能可以關閉但無法編輯。複製一份即可建立你自己的版本。"
+  },
+  "options_skills_custom": {
+    "message": "你的技能"
+  },
+  "options_skills_custom_empty": {
+    "message": "你還沒有自己的技能。可以用「新增技能」撰寫、匯入 SKILL.md 檔案，或複製一個內建技能再調整。"
+  },
+  "options_skills_new": {
+    "message": "新增技能"
+  },
+  "options_skills_import": {
+    "message": "匯入 SKILL.md"
+  },
+  "options_skills_import_failed": {
+    "message": "$FILE$ 沒有可匯入的指示。",
+    "placeholders": {
+      "file": {
+        "content": "$1",
+        "example": "notes.md"
+      }
+    }
+  },
+  "options_skills_import_review": {
+    "message": "已匯入。請檢查下方的技能後再儲存。"
+  },
+  "options_skills_enable": {
+    "message": "使用這個技能"
+  },
+  "options_skills_showSteps": {
+    "message": "顯示步驟"
+  },
+  "options_skills_hideSteps": {
+    "message": "隱藏步驟"
+  },
+  "options_skills_duplicate": {
+    "message": "複製"
+  },
+  "options_skills_edit": {
+    "message": "編輯"
+  },
+  "options_skills_delete": {
+    "message": "刪除"
+  },
+  "options_skills_export": {
+    "message": "匯出"
+  },
+  "options_skills_usage": {
+    "message": "已使用 $COUNT$ 次，最近一次在 $DATE$",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "3"
+      },
+      "date": {
+        "content": "$2",
+        "example": "19/10/2026"
+      }
+    }
+  },
+  "options_skills_neverUsed": {
+    "message": "尚未使用"
+  },
+  "options_skills_form_new": {
+    "message": "新增技能"
+  },
+  "options_skills_form_edit": {
+    "message": "編輯技能"
+  },
+  "options_skills_name": {
+    "message": "名稱"
+  },
+  "options_skills_name_placeholder": {
+    "message": "例如 price-watch"
+  },
+  "options_skills_call": {
+    "message": "在聊天中輸入 /$NAME$ 呼叫",
+    "placeholders": {
+      "name": {
+        "content": "$1",
+        "example": "price-watch"
+      }
+    }
+  },
+  "options_skills_renamed": {
+    "message": "/$WANTED$ 已被使用，因此會儲存為 /$NAME$。",
+    "placeholders": {
+      "wanted": {
+        "content": "$1",
+        "example": "web-research"
+      },
+      "name": {
+        "content": "$2",
+        "example": "web-research-2"
+      }
+    }
+  },
+  "options_skills_description": {
+    "message": "使用時機"
+  },
+  "options_skills_description_placeholder": {
+    "message": "在……時使用。一句話即可，Flowkite 會依此判斷何時套用這個技能。"
+  },
+  "options_skills_instructions": {
+    "message": "步驟"
+  },
+  "options_skills_instructions_placeholder": {
+    "message": "一步一步寫下流程，就像向新同事說明一樣。"
+  },
+  "options_skills_count": {
+    "message": "$COUNT$ / $MAX$ 個字元",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "1200"
+      },
+      "max": {
+        "content": "$2",
+        "example": "8000"
+      }
+    }
+  },
+  "options_skills_save": {
+    "message": "儲存技能"
+  },
+  "options_skills_cancel": {
+    "message": "取消"
+  },
+  "options_skills_saved": {
+    "message": "已儲存為 /$NAME$。",
+    "placeholders": {
+      "name": {
+        "content": "$1",
+        "example": "price-watch"
+      }
+    }
+  },
+  "options_skills_full": {
+    "message": "你的技能庫已滿（$MAX$ 個技能）。請刪除不再使用的技能後再新增。",
+    "placeholders": {
+      "max": {
+        "content": "$1",
+        "example": "50"
+      }
+    }
+  },
+  "options_skills_builtin_webResearch_title": {
+    "message": "網路研究"
+  },
+  "options_skills_builtin_webResearch_desc": {
+    "message": "從多個來源交叉核對後回答問題，並附上連結。"
+  },
+  "options_skills_builtin_compareOptions_title": {
+    "message": "比較選項"
+  },
+  "options_skills_builtin_compareOptions_desc": {
+    "message": "比較各家商店的產品、價格或方案，並推薦一個。"
+  },
+  "options_skills_builtin_collectList_title": {
+    "message": "收集清單"
+  },
+  "options_skills_builtin_collectList_desc": {
+    "message": "把大量項目整理成可下載為 CSV 的表格。"
+  },
+  "options_skills_builtin_fillForm_title": {
+    "message": "填寫表單"
+  },
+  "options_skills_builtin_fillForm_desc": {
+    "message": "仔細填寫網頁表單，並在任何無法復原的動作前停下。"
+  },
+  "options_skills_builtin_summarizePage_title": {
+    "message": "摘要頁面"
+  },
+  "options_skills_builtin_summarizePage_desc": {
+    "message": "把目前的頁面、文章或討論串整理成重點。"
+  },
+  "options_skills_builtin_inboxAssistant_title": {
+    "message": "收件匣助理"
+  },
+  "options_skills_builtin_inboxAssistant_desc": {
+    "message": "在 Gmail 或 Outlook 中閱讀、整理並草擬郵件，絕不自行寄出。"
+  },
+  "options_skills_builtin_travelSearch_title": {
+    "message": "旅遊搜尋"
+  },
+  "options_skills_builtin_travelSearch_desc": {
+    "message": "搜尋並比較機票、火車與住宿，不會進行任何預訂。"
+  },
+  "options_skills_builtin_checkStatus_title": {
+    "message": "檢查狀態"
+  },
+  "options_skills_builtin_checkStatus_desc": {
+    "message": "依你的條件檢查價格、庫存或狀態，適合搭配排程。"
   }
 }

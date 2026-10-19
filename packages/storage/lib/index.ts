@@ -5,8 +5,10 @@ export * from './profile';
 export * from './prompt/favorites';
 export * from './memory/memoryStore';
 export * from './attachments/uploads';
+export * from './skills';
 
 // Re-export the favorites instance for direct use
 export { default as favoritesStorage } from './prompt/favorites';
 export { default as memoryStorage } from './memory/memoryStore';
 export { default as uploadsStorage } from './attachments/uploads';
+export { default as skillStorage } from './skills/skillStore';

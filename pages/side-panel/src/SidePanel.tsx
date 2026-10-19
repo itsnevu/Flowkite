@@ -21,6 +21,7 @@ import { useModelConfigGate } from './hooks/useModelConfigGate';
 import { useSpeechInput } from './hooks/useSpeechInput';
 import { useTaskDispatch } from './hooks/useTaskDispatch';
 import { useTaskStateHandler } from './hooks/useTaskStateHandler';
+import { isPrefillForThisPanel } from './panelTab';
 import type {
   ActionConfirmationPayload,
   BudgetPausePayload,
@@ -513,7 +514,10 @@ const SidePanel = () => {
     const applyPendingPrefill = async () => {
       try {
         const { pendingPrefill } = await chrome.storage.session.get('pendingPrefill');
-        const text = (pendingPrefill as { text?: unknown } | undefined)?.text;
+        const prefill = pendingPrefill as { text?: unknown; tabId?: unknown } | undefined;
+        const text = prefill?.text;
+        // Every open panel hears this change; only the one on the right-clicked tab takes it.
+        if (!isPrefillForThisPanel(prefill?.tabId)) return;
         if (typeof text === 'string' && text && setInputTextRef.current) {
           setInputTextRef.current(text);
           await chrome.storage.session.remove('pendingPrefill');

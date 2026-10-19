@@ -57,6 +57,11 @@ export enum ExecutionState {
   ACT_DECLINED = 'act.declined',
   /** The agent handed the tab to the user (login, captcha, OTP) and waits for "done" */
   ACT_HANDOFF = 'act.handoff',
+  /**
+   * The agent is now on a different page or tab than at its last step. Details carry a sentence
+   * naming the site; it is a status update, not an action, so nothing becomes undoable because of it.
+   */
+  PAGE_CHANGE = 'page.change',
 }
 
 export interface EventData {

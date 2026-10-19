@@ -8,6 +8,7 @@ import {
   type KeyInput,
 } from 'puppeteer-core/lib/esm/puppeteer/puppeteer-core-browser.js';
 import { createLogger } from '@src/background/log';
+import { t } from '@extension/i18n';
 import {
   getClickableElements as _getClickableElements,
   removeHighlights as _removeHighlights,
@@ -17,7 +18,9 @@ import {
 import { DOMElementNode, type DOMState } from './dom/views';
 import {
   ACTIVITY_STOP_BINDING,
+  markActivityScroll as _markActivityScroll,
   markActivityTarget as _markActivityTarget,
+  showNavigationPending as _showNavigationPending,
   prepareForCapture,
   restoreAfterCapture,
   readVisibleTextWithoutOverlay,
@@ -26,6 +29,7 @@ import {
   sanitizeOverlayDetail,
   takeActivityStopRequest,
   type ActivityOverlayContent,
+  type ActivityTargetMode,
   type ActivityTargetRect,
 } from './activityOverlay';
 import { type BrowserContextConfig, DEFAULT_BROWSER_CONTEXT_CONFIG, type PageState, URLNotAllowedError } from './views';
@@ -48,6 +52,27 @@ const CLICK_DEADLINE_MS = 2000;
 
 /** How often the overlay's stop button is polled, on the pages where its binding did not install. */
 const ACTIVITY_STOP_POLL_MS = 500;
+
+/**
+ * The most an action waits for the drawn pointer to reach its target. The page reports the real
+ * travel time; this only bounds a page that reports nonsense.
+ */
+const MAX_POINTER_TRAVEL_MS = 600;
+
+/** Wait out an on-page animation the page reported, bounded, and not at all when it reported none. */
+function settle(ms: number, ceiling: number): Promise<void> {
+  const wait = Math.min(Math.max(0, Number.isFinite(ms) ? ms : 0), ceiling);
+  return wait > 0 ? new Promise(resolve => setTimeout(resolve, wait)) : Promise.resolve();
+}
+
+/** The host to name in "Opening <host>", or the start of the URL when it does not parse. */
+function hostOf(url: string): string {
+  try {
+    return new URL(url).host || url.slice(0, 60);
+  } catch {
+    return url.slice(0, 60);
+  }
+}
 
 /** The same poll on a tab that is not on screen, where nobody can be pressing anything. */
 const ACTIVITY_STOP_POLL_HIDDEN_MS = 3000;
@@ -235,6 +260,13 @@ export default class Page {
 
     this._handleJavaScriptDialogs();
 
+    // A navigation destroys the overlay along with the document. Redrawing it as soon as the new
+    // document can take it, rather than at the agent's next action, is what keeps the banner, the
+    // pointer and the "now on" notice on screen while the agent reads the page it just opened.
+    this._puppeteerPage.on('domcontentloaded', () => {
+      void this._redrawActivityOverlay();
+    });
+
     return true;
   }
 
@@ -381,8 +413,18 @@ export default class Page {
     }
   }
 
-  /** Move the drawn cursor onto an element and ring it, just before the agent acts on it. */
-  async markActivityTarget(element: ElementHandle): Promise<void> {
+  /**
+   * Move the drawn pointer onto an element and ring it, just before the agent acts on it, and wait
+   * for it to get there.
+   *
+   * The wait is the point. The pointer used to be sent on its way and the click fired in the same
+   * instant, so the user saw an element react and a cursor arrive afterwards, if at all (a click that
+   * navigates takes the overlay with it). Waiting for the travel time, at most about half a second,
+   * makes the movement and the action one event the user can follow.
+   *
+   * @param holdMs - for `type`, how long the typing caret stays on after arrival
+   */
+  async markActivityTarget(element: ElementHandle, mode: ActivityTargetMode = 'click', holdMs = 0): Promise<void> {
     const content = this._activityContent;
     if (!content || !this._puppeteerPage) return;
     try {
@@ -390,17 +432,53 @@ export default class Page {
       if (!box) return;
       const rect: ActivityTargetRect = { x: box.x, y: box.y, width: box.width, height: box.height };
       this._activityCursorAt = { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
-      const drawn = await this._puppeteerPage.evaluate(_markActivityTarget, rect);
-      if (!drawn) {
+      let travel = await this._puppeteerPage.evaluate(_markActivityTarget, rect, mode, holdMs);
+      if (travel < 0) {
         // The host went with a document rebuild the url never announced. This is the repair that
         // lets showActivityOverlay skip redundant redraws without risking a banner that stays gone.
         this._activityDrawnKey = null;
         await this.showActivityOverlay(content, true);
-        await this._puppeteerPage.evaluate(_markActivityTarget, rect);
+        travel = await this._puppeteerPage.evaluate(_markActivityTarget, rect, mode, holdMs);
       }
+      await settle(travel, MAX_POINTER_TRAVEL_MS);
     } catch (error) {
       logger.debug('Could not mark the activity target:', error);
     }
+  }
+
+  /** Show which way the agent is scrolling, with the pointer in the middle of the page. */
+  async markActivityScroll(direction: 'up' | 'down'): Promise<void> {
+    const content = this._activityContent;
+    if (!content || !this._puppeteerPage) return;
+    try {
+      let travel = await this._puppeteerPage.evaluate(_markActivityScroll, direction);
+      if (travel < 0) {
+        this._activityDrawnKey = null;
+        await this.showActivityOverlay(content, true);
+        travel = await this._puppeteerPage.evaluate(_markActivityScroll, direction);
+      }
+      this._activityCursorAt = null;
+      await settle(travel, MAX_POINTER_TRAVEL_MS);
+    } catch (error) {
+      logger.debug('Could not mark the scroll:', error);
+    }
+  }
+
+  /** Put "Opening example.com" and a progress bar on the page that is about to be replaced. */
+  private async announceNavigation(label: string): Promise<void> {
+    if (!this._activityContent || !this._puppeteerPage) return;
+    try {
+      await this._puppeteerPage.evaluate(_showNavigationPending, sanitizeOverlayDetail(label));
+    } catch (error) {
+      logger.debug('Could not announce the navigation:', error);
+    }
+  }
+
+  /** Draw the banner again after the document changed, if this page is being driven. */
+  private async _redrawActivityOverlay(): Promise<void> {
+    const content = this._activityContent;
+    if (!content) return;
+    await this.showActivityOverlay(content);
   }
 
   /** Take the banner off this page and forget it, so a later navigation does not bring it back. */
@@ -973,8 +1051,11 @@ export default class Page {
       throw new URLNotAllowedError(`URL: ${url} is not allowed`);
     }
 
+    await this.announceNavigation(t('bg_overlay_opening', [hostOf(url)]));
+
     try {
       await Promise.all([this.waitForPageAndFramesLoad(), this._puppeteerPage.goto(url)]);
+      await this._redrawActivityOverlay();
       logger.info('navigateTo complete');
     } catch (error) {
       if (error instanceof URLNotAllowedError) {
@@ -994,8 +1075,11 @@ export default class Page {
   async refreshPage(): Promise<void> {
     if (!this._puppeteerPage) return;
 
+    await this.announceNavigation(t('bg_overlay_reloading'));
+
     try {
       await Promise.all([this.waitForPageAndFramesLoad(), this._puppeteerPage.reload()]);
+      await this._redrawActivityOverlay();
       logger.info('Page refresh complete');
     } catch (error) {
       if (error instanceof URLNotAllowedError) {
@@ -1015,8 +1099,11 @@ export default class Page {
   async goBack(): Promise<void> {
     if (!this._puppeteerPage) return;
 
+    await this.announceNavigation(t('bg_overlay_goingBack'));
+
     try {
       await Promise.all([this.waitForPageAndFramesLoad(), this._puppeteerPage.goBack()]);
+      await this._redrawActivityOverlay();
       logger.info('Navigation back completed');
     } catch (error) {
       if (error instanceof URLNotAllowedError) {
@@ -1036,8 +1123,11 @@ export default class Page {
   async goForward(): Promise<void> {
     if (!this._puppeteerPage) return;
 
+    await this.announceNavigation(t('bg_overlay_goingForward'));
+
     try {
       await Promise.all([this.waitForPageAndFramesLoad(), this._puppeteerPage.goForward()]);
+      await this._redrawActivityOverlay();
       logger.info('Navigation forward completed');
     } catch (error) {
       if (error instanceof URLNotAllowedError) {
@@ -1062,6 +1152,7 @@ export default class Page {
     if (!this._puppeteerPage) {
       throw new Error('Puppeteer is not connected');
     }
+    await this.markActivityScroll(yPercent < 50 ? 'up' : 'down');
     if (!elementNode) {
       // Through the shared resolver, so this moves whatever getScrollInfo just measured.
       await _scrollPage(this._tabId, { kind: 'toPercent', yPercent });
@@ -1094,6 +1185,7 @@ export default class Page {
     if (!this._puppeteerPage) {
       throw new Error('Puppeteer is not connected');
     }
+    await this.markActivityScroll(y < 0 ? 'up' : 'down');
     if (!elementNode) {
       await this._puppeteerPage.evaluate(y => {
         window.scrollBy({
@@ -1127,6 +1219,7 @@ export default class Page {
     if (!this._puppeteerPage) {
       throw new Error('Puppeteer is not connected');
     }
+    await this.markActivityScroll('up');
 
     if (!elementNode) {
       await _scrollPage(this._tabId, { kind: 'byPages', pages: -1 });
@@ -1153,6 +1246,7 @@ export default class Page {
     if (!this._puppeteerPage) {
       throw new Error('Puppeteer is not connected');
     }
+    await this.markActivityScroll('down');
 
     if (!elementNode) {
       await _scrollPage(this._tabId, { kind: 'byPages', pages: 1 });
@@ -1586,7 +1680,8 @@ export default class Page {
         logger.debug(`Non-critical error preparing element: ${e}`);
       }
 
-      await this.markActivityTarget(element);
+      // The caret stays on for about as long as the 50 ms-per-key typing below takes.
+      await this.markActivityTarget(element, 'type', text.length * 50 + 300);
 
       // Get element properties to determine input method
       const tagName = await element.evaluate(el => el.tagName.toLowerCase());
@@ -1865,7 +1960,7 @@ export default class Page {
       }
 
       await this._scrollIntoViewIfNeeded(element);
-      await this.markActivityTarget(element);
+      await this.markActivityTarget(element, 'hover');
 
       try {
         await element.hover();

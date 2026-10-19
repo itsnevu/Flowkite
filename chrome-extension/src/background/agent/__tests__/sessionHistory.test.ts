@@ -74,4 +74,15 @@ describe('session history recovery', () => {
     expect(contents.filter(content => content.includes('Previous user prompt'))).toHaveLength(0);
     expect(contents.some(content => content.includes('Previous outcome: Previously completed'))).toBe(true);
   });
+
+  it('keeps a prompt that invoked a skill, which is a real turn rather than a panel command', async () => {
+    const { executor, manager } = setup([
+      message(Actors.USER, '/web-research best e-bikes'),
+      message(Actors.SYSTEM, 'The best rated one is X'),
+      message(Actors.USER, currentTask),
+    ]);
+    await executor.injectSessionHistory();
+    const contents = manager.getMessages().map(msg => String(msg.content));
+    expect(contents.some(content => content.includes('/web-research best e-bikes'))).toBe(true);
+  });
 });

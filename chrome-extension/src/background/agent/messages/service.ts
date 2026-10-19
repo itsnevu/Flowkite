@@ -280,6 +280,28 @@ export default class MessageManager {
   }
 
   /**
+   * Adds the skills catalog: one line per skill the agent may load with use_skill.
+   *
+   * Tagged 'init' so trimming never evicts it. It is a few short lines, and an agent that forgets
+   * which skills exist half way through a long run just stops using them.
+   */
+  public addSkillCatalog(catalog: string): void {
+    if (!catalog.trim()) return;
+    // the caller filtered each user-written description; filtering again would mangle the framing
+    this.addMessageWithTokens(new HumanMessage({ content: wrapUserRequest(catalog, false) }), 'init');
+  }
+
+  /**
+   * Adds a skill the user invoked by name, before the run starts. Pinned like the catalog, because
+   * the run follows this procedure from its first step to its last.
+   */
+  public addSkillInstructions(instructions: string): void {
+    if (!instructions.trim()) return;
+    // already filtered by the caller, for the same reason as the catalog
+    this.addMessageWithTokens(new HumanMessage({ content: wrapUserRequest(instructions, false) }), 'init');
+  }
+
+  /**
    * Adds prior conversation exchanges from the current chat session into history.
    *
    * Formats past user prompts and agent responses clearly so the model understands the

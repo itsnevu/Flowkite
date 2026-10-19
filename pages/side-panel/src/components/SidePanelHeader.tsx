@@ -18,7 +18,10 @@ const iconButtonClass =
 
 /** A raised bar floating on the canvas, lit from the top-left. */
 const SidePanelHeader = ({ showHistory, onBack, onNewChat, onLoadHistory }: SidePanelHeaderProps) => (
-  <header className="relative z-10 m-2 flex shrink-0 items-center justify-between gap-2 rounded-slab bg-canvas-raised px-2.5 py-2 shadow-neu">
+  // order-first, like the empty-state composer in ChatView: that composer is lifted with CSS order
+  // (so it stays one mounted element across states), and without the same order here it was lifted
+  // above the header too. Equal order falls back to DOM order, which keeps the header on top.
+  <header className="relative z-10 order-first m-2 flex shrink-0 items-center justify-between gap-2 rounded-slab bg-canvas-raised px-2.5 py-2 shadow-neu">
     <div className="flex min-w-0 items-center gap-2">
       {showHistory ? (
         <button

@@ -11,11 +11,23 @@ import {
   URLNotAllowedError,
 } from './views';
 import Page, { build_initial_state } from './page';
-import { sanitizeOverlayDetail } from './activityOverlay';
+import { sanitizeOverlayDetail, type ActivityOverlayContent } from './activityOverlay';
 import { isUrlAllowed } from './util';
 import TaskTabGroup, { type TabGroupStatus } from './tabGroup';
 
 const logger = createLogger('BrowserContext');
+
+/** Everything the on-page banner says, in the user's language, around the agent's current line. */
+function activityOverlayContent(detail: string): ActivityOverlayContent {
+  return {
+    title: t('bg_overlay_active'),
+    detail,
+    stopLabel: t('bg_overlay_stop'),
+    // `{host}` is a literal token the page replaces with location.host; see ActivityOverlayContent.
+    arrivalTemplate: t('bg_overlay_nowOn', ['{host}']),
+    leavingLabel: t('bg_overlay_leaving'),
+  };
+}
 
 /**
  * Best-effort append to the user's own local activity log (the privacy dashboard's data). Only
@@ -162,11 +174,7 @@ export default class BrowserContext {
     // task moves to, and a second path onto the page must not be a second chance to get raw text there.
     this._activityDetail = sanitizeOverlayDetail(detail);
     const page = this._currentTabId !== null ? this._attachedPages.get(this._currentTabId) : undefined;
-    await page?.showActivityOverlay({
-      title: t('bg_overlay_active'),
-      detail: this._activityDetail,
-      stopLabel: t('bg_overlay_stop'),
-    });
+    await page?.showActivityOverlay(activityOverlayContent(this._activityDetail));
   }
 
   /** Take the banner off every tab this task touched. Never throws: it runs on the teardown path. */
@@ -196,13 +204,7 @@ export default class BrowserContext {
       // A tab the task switches to mid-run has to carry the banner too, so it is drawn on arrival
       // rather than waiting for the next action to redraw it.
       if (this._activityDetail !== null) {
-        void page
-          .showActivityOverlay({
-            title: t('bg_overlay_active'),
-            detail: this._activityDetail,
-            stopLabel: t('bg_overlay_stop'),
-          })
-          .catch(() => undefined);
+        void page.showActivityOverlay(activityOverlayContent(this._activityDetail)).catch(() => undefined);
       }
       // Disclose the tab as agent-driven. Awaited so the chip is in place before the agent acts on
       // the page, but it can never fail the attach - TaskTabGroup swallows its own errors.

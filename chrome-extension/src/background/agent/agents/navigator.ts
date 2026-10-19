@@ -194,6 +194,7 @@ export class NavigatorAgent extends BaseAgent<z.ZodType, NavigatorResult> {
       await this.addStateMessageToMemory();
       const currentState = await this.context.browserContext.getCachedState();
       browserStateHistory = new BrowserStateHistory(currentState);
+      this.announcePageChange(currentState);
 
       // check if the task is paused or stopped
       if (this.context.paused || this.context.stopped) {
@@ -295,6 +296,32 @@ export class NavigatorAgent extends BaseAgent<z.ZodType, NavigatorResult> {
   }
 
   /**
+   * Tell the panel when the agent is on a different page or tab than at its last step.
+   *
+   * Read from the state the step was just given, so it costs nothing and fires once per page the
+   * agent actually works on, whatever got it there: a go_to_url, a link, a form, a redirect, a tab
+   * switch. The host leads the sentence because it is the part the page cannot choose; the title is
+   * the page's own text and is shown as a quote, trimmed.
+   */
+  private announcePageChange(state: { tabId: number; url: string; title: string } | null): void {
+    if (!state?.url) return;
+    const key = `${state.tabId}|${state.url.split('#')[0]}`;
+    if (key === this.context.lastAnnouncedPage) return;
+    this.context.lastAnnouncedPage = key;
+
+    let host = '';
+    try {
+      host = new URL(state.url).host;
+    } catch {
+      // not a web address the user would recognise
+    }
+    if (!host) return;
+    const title = (state.title || '').replace(/\s+/g, ' ').trim().slice(0, 80);
+    const text = title ? t('act_pageChange', [host, title]) : t('act_pageChange_hostOnly', [host]);
+    this.context.emitEvent(Actors.NAVIGATOR, ExecutionState.PAGE_CHANGE, text);
+  }
+
+  /**
    * Add the state message to the memory
    */
   public async addStateMessageToMemory() {
@@ -311,7 +338,8 @@ export class NavigatorAgent extends BaseAgent<z.ZodType, NavigatorResult> {
           if (r.extractedContent) {
             const msg = new HumanMessage(`Action result: ${r.extractedContent}`);
             // logger.info('Adding action result to memory', msg.content);
-            messageManager.addMessageWithTokens(msg);
+            // 'init' is the tag history trimming never evicts; a pinned result outlives the trim.
+            messageManager.addMessageWithTokens(msg, r.pinned ? 'init' : null);
           }
           if (r.error) {
             // Get error text and convert to string

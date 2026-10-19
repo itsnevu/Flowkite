@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   ACTIVITY_OVERLAY_ID,
   ACTIVITY_STOP_BINDING,
+  markActivityScroll,
   markActivityTarget,
   prepareForCapture,
   readVisibleTextWithoutOverlay,
@@ -9,6 +10,7 @@ import {
   renderActivityOverlay,
   restoreAfterCapture,
   sanitizeOverlayDetail,
+  showNavigationPending,
   takeActivityStopRequest,
 } from '../activityOverlay';
 
@@ -26,6 +28,8 @@ import {
 const INJECTED = {
   renderActivityOverlay,
   markActivityTarget,
+  markActivityScroll,
+  showNavigationPending,
   prepareForCapture,
   restoreAfterCapture,
   readVisibleTextWithoutOverlay,
@@ -87,6 +91,8 @@ describe('injected overlay functions', () => {
   it('every function that looks the host up spells the id out', () => {
     const lookups = [
       markActivityTarget,
+      markActivityScroll,
+      showNavigationPending,
       prepareForCapture,
       restoreAfterCapture,
       readVisibleTextWithoutOverlay,
@@ -120,6 +126,18 @@ describe('injected overlay functions', () => {
     expect(detailOpen).toBeGreaterThan(badgeOpen);
     // The badge has to have closed before the detail opens, or the agent's line is inside the pill.
     expect(markup.slice(badgeOpen, detailOpen)).toContain('</div>');
+  });
+
+  it('names the site it arrived on from the address bar, never from the page title', () => {
+    // The arrival toast is drawn in Flowkite's own styling. A title is the page's own text, so a
+    // title of "Session expired, enter your password" would be printed as if Flowkite said it.
+    const source = renderActivityOverlay.toString();
+    expect(source).toContain('location.host');
+    expect(source).not.toContain('document.title');
+  });
+
+  it('the pointer carries the product name, and only the product name', () => {
+    expect(renderActivityOverlay.toString()).toMatch(/<span class="tag">Flowkite</);
   });
 
   it('nothing in the overlay can swallow a click except the stop button', () => {

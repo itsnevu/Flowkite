@@ -330,7 +330,7 @@
     "message": "Error Occurred"
   },
   "options_masthead_subtitle": {
-    "message": "Local multi-agent web automation — tune the agents, their limits and their guardrails."
+    "message": "Local multi-agent web automation. Tune the agents, their limits and their guardrails."
   },
   "options_general_header": {
     "message": "General"
@@ -2127,7 +2127,7 @@
     "message": "Capped"
   },
   "chat_dataset_showing": {
-    "message": "Showing $SHOWN$ of $TOTAL$ rows — download to get all of them.",
+    "message": "Showing $SHOWN$ of $TOTAL$ rows. Download to get all of them.",
     "placeholders": {
       "shown": {
         "content": "$1",
@@ -2367,5 +2367,358 @@
   },
   "act_crawl_result": {
     "message": "Crawl progress: $1 pages read, $2 rows collected, $3 URLs pending, $4 pages failed."
+  },
+  "act_useSkill_start": {
+    "message": "Loading the $NAME$ skill",
+    "placeholders": {
+      "name": {
+        "content": "$1",
+        "example": "web-research"
+      }
+    }
+  },
+  "act_useSkill_ok": {
+    "message": "Using the $NAME$ skill",
+    "placeholders": {
+      "name": {
+        "content": "$1",
+        "example": "web-research"
+      }
+    }
+  },
+  "act_useSkill_already": {
+    "message": "The $NAME$ skill is already loaded",
+    "placeholders": {
+      "name": {
+        "content": "$1",
+        "example": "web-research"
+      }
+    }
+  },
+  "act_useSkill_notFound": {
+    "message": "There is no enabled skill called $NAME$. Available skills: $AVAILABLE$",
+    "placeholders": {
+      "name": {
+        "content": "$1",
+        "example": "price-watch"
+      },
+      "available": {
+        "content": "$2",
+        "example": "web-research, fill-form"
+      }
+    }
+  },
+  "exec_skill_applied": {
+    "message": "Using the $NAME$ skill you chose",
+    "placeholders": {
+      "name": {
+        "content": "$1",
+        "example": "web-research"
+      }
+    }
+  },
+  "act_pageChange": {
+    "message": "Now on $HOST$: $TITLE$",
+    "placeholders": {
+      "host": {
+        "content": "$1",
+        "example": "github.com"
+      },
+      "title": {
+        "content": "$2",
+        "example": "Pull requests"
+      }
+    }
+  },
+  "act_pageChange_hostOnly": {
+    "message": "Now on $HOST$",
+    "placeholders": {
+      "host": {
+        "content": "$1",
+        "example": "github.com"
+      }
+    }
+  },
+  "bg_overlay_nowOn": {
+    "message": "Now on $HOST$",
+    "placeholders": {
+      "host": {
+        "content": "$1",
+        "example": "github.com"
+      }
+    }
+  },
+  "bg_overlay_opening": {
+    "message": "Opening $HOST$",
+    "placeholders": {
+      "host": {
+        "content": "$1",
+        "example": "github.com"
+      }
+    }
+  },
+  "bg_overlay_goingBack": {
+    "message": "Going back to the previous page"
+  },
+  "bg_overlay_goingForward": {
+    "message": "Going forward to the next page"
+  },
+  "bg_overlay_reloading": {
+    "message": "Reloading the page"
+  },
+  "bg_overlay_leaving": {
+    "message": "Opening the next page"
+  },
+  "chat_skills_picker_label": {
+    "message": "Skills"
+  },
+  "chat_skills_picker_empty": {
+    "message": "No skill starts with /$QUERY$",
+    "placeholders": {
+      "query": {
+        "content": "$1",
+        "example": "pri"
+      }
+    }
+  },
+  "chat_skills_picker_hint": {
+    "message": "↑↓ to choose · Enter to use · Esc to close"
+  },
+  "chat_skills_picker_manage": {
+    "message": "Manage skills"
+  },
+  "chat_skills_selected": {
+    "message": "This task will follow the $NAME$ skill.",
+    "placeholders": {
+      "name": {
+        "content": "$1",
+        "example": "web-research"
+      }
+    }
+  },
+  "chat_skills_disabled": {
+    "message": "The /$NAME$ skill is switched off. Turn it on under Settings, Skills, or type / to pick another one.",
+    "placeholders": {
+      "name": {
+        "content": "$1",
+        "example": "web-research"
+      }
+    }
+  },
+  "chat_skills_unknown": {
+    "message": "There is no skill or command called /$NAME$. Type / to see your skills.",
+    "placeholders": {
+      "name": {
+        "content": "$1",
+        "example": "price-wach"
+      }
+    }
+  },
+  "options_tabs_skills": {
+    "message": "Skills"
+  },
+  "options_skills_header": {
+    "message": "Skills"
+  },
+  "options_skills_desc": {
+    "message": "Skills are reusable playbooks for a kind of task. Flowkite loads the right one when a task fits, or you choose one yourself by typing / and its name in the chat. Your skills are stored only in this browser."
+  },
+  "options_skills_builtin": {
+    "message": "Built-in skills"
+  },
+  "options_skills_builtin_note": {
+    "message": "Built-in skills can be switched off but not edited. Duplicate one to make your own version."
+  },
+  "options_skills_custom": {
+    "message": "Your skills"
+  },
+  "options_skills_custom_empty": {
+    "message": "No skills of your own yet. Write one with New skill, import a SKILL.md file, or duplicate a built-in skill and adjust it."
+  },
+  "options_skills_new": {
+    "message": "New skill"
+  },
+  "options_skills_import": {
+    "message": "Import SKILL.md"
+  },
+  "options_skills_import_failed": {
+    "message": "$FILE$ has no instructions to import.",
+    "placeholders": {
+      "file": {
+        "content": "$1",
+        "example": "notes.md"
+      }
+    }
+  },
+  "options_skills_import_review": {
+    "message": "Imported. Check the skill below, then save it."
+  },
+  "options_skills_enable": {
+    "message": "Use this skill"
+  },
+  "options_skills_showSteps": {
+    "message": "Show steps"
+  },
+  "options_skills_hideSteps": {
+    "message": "Hide steps"
+  },
+  "options_skills_duplicate": {
+    "message": "Duplicate"
+  },
+  "options_skills_edit": {
+    "message": "Edit"
+  },
+  "options_skills_delete": {
+    "message": "Delete"
+  },
+  "options_skills_export": {
+    "message": "Export"
+  },
+  "options_skills_usage": {
+    "message": "Used $COUNT$ times, last on $DATE$",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "3"
+      },
+      "date": {
+        "content": "$2",
+        "example": "19/10/2026"
+      }
+    }
+  },
+  "options_skills_neverUsed": {
+    "message": "Not used yet"
+  },
+  "options_skills_form_new": {
+    "message": "New skill"
+  },
+  "options_skills_form_edit": {
+    "message": "Edit skill"
+  },
+  "options_skills_name": {
+    "message": "Name"
+  },
+  "options_skills_name_placeholder": {
+    "message": "e.g. price-watch"
+  },
+  "options_skills_call": {
+    "message": "Call it in the chat with /$NAME$",
+    "placeholders": {
+      "name": {
+        "content": "$1",
+        "example": "price-watch"
+      }
+    }
+  },
+  "options_skills_renamed": {
+    "message": "/$WANTED$ is already taken, so this will be saved as /$NAME$.",
+    "placeholders": {
+      "wanted": {
+        "content": "$1",
+        "example": "web-research"
+      },
+      "name": {
+        "content": "$2",
+        "example": "web-research-2"
+      }
+    }
+  },
+  "options_skills_description": {
+    "message": "When to use it"
+  },
+  "options_skills_description_placeholder": {
+    "message": "Use when ... One sentence. Flowkite reads this to decide when the skill fits."
+  },
+  "options_skills_instructions": {
+    "message": "Steps"
+  },
+  "options_skills_instructions_placeholder": {
+    "message": "Write the procedure step by step, the way you would explain it to a new colleague."
+  },
+  "options_skills_count": {
+    "message": "$COUNT$ of $MAX$ characters",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "1200"
+      },
+      "max": {
+        "content": "$2",
+        "example": "8000"
+      }
+    }
+  },
+  "options_skills_save": {
+    "message": "Save skill"
+  },
+  "options_skills_cancel": {
+    "message": "Cancel"
+  },
+  "options_skills_saved": {
+    "message": "Saved as /$NAME$.",
+    "placeholders": {
+      "name": {
+        "content": "$1",
+        "example": "price-watch"
+      }
+    }
+  },
+  "options_skills_full": {
+    "message": "Your library is full ($MAX$ skills). Delete one you no longer use to add another.",
+    "placeholders": {
+      "max": {
+        "content": "$1",
+        "example": "50"
+      }
+    }
+  },
+  "options_skills_builtin_webResearch_title": {
+    "message": "Web research"
+  },
+  "options_skills_builtin_webResearch_desc": {
+    "message": "Answers a question from several sources, cross-checked, with links."
+  },
+  "options_skills_builtin_compareOptions_title": {
+    "message": "Compare options"
+  },
+  "options_skills_builtin_compareOptions_desc": {
+    "message": "Compares products, prices or plans across shops and recommends one."
+  },
+  "options_skills_builtin_collectList_title": {
+    "message": "Collect a list"
+  },
+  "options_skills_builtin_collectList_desc": {
+    "message": "Gathers many items into a table you can download as CSV."
+  },
+  "options_skills_builtin_fillForm_title": {
+    "message": "Fill a form"
+  },
+  "options_skills_builtin_fillForm_desc": {
+    "message": "Fills web forms carefully and stops before anything that cannot be undone."
+  },
+  "options_skills_builtin_summarizePage_title": {
+    "message": "Summarize a page"
+  },
+  "options_skills_builtin_summarizePage_desc": {
+    "message": "Turns the current page, article or thread into its key points."
+  },
+  "options_skills_builtin_inboxAssistant_title": {
+    "message": "Inbox assistant"
+  },
+  "options_skills_builtin_inboxAssistant_desc": {
+    "message": "Reads, sorts and drafts email in Gmail or Outlook, and never sends on its own."
+  },
+  "options_skills_builtin_travelSearch_title": {
+    "message": "Travel search"
+  },
+  "options_skills_builtin_travelSearch_desc": {
+    "message": "Finds and compares flights, trains and stays, without booking anything."
+  },
+  "options_skills_builtin_checkStatus_title": {
+    "message": "Check status"
+  },
+  "options_skills_builtin_checkStatus_desc": {
+    "message": "Checks a price, stock or status against your condition. Good for schedules."
   }
 }

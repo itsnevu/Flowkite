@@ -14,6 +14,7 @@ const DOT: Record<TrailKind, string> = {
   ok: 'bg-signal-ok',
   error: 'bg-signal-bad',
   note: 'bg-graphite-300',
+  page: 'bg-accent',
 };
 
 /**

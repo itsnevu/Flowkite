@@ -2,9 +2,11 @@ import { ActionResult, type AgentContext } from '@src/background/agent/types';
 import { t } from '@extension/i18n';
 import { z } from 'zod';
 import { createLogger } from '@src/background/log';
-import { memoryStore, MemoryScope, uploadsStore, chatHistoryStore } from '@extension/storage';
+import { memoryStore, MemoryScope, uploadsStore, chatHistoryStore, skillStore } from '@extension/storage';
 import { runCrawl, parseCrawlRecords } from '../crawl';
-import { wrapUntrustedContent } from '../messages/utils';
+import { filterExternalContent, wrapUntrustedContent } from '../messages/utils';
+import { formatSkillInstructions } from '../skills';
+import { toPlainText } from '../plainText';
 import { StaleElementError } from '../agents/errors';
 import { ExecutionState, Actors } from '../event/types';
 import {
@@ -36,6 +38,7 @@ import {
   scrollToTextActionSchema,
   cacheContentActionSchema,
   rememberActionSchema,
+  useSkillActionSchema,
   runParallelSubtasksActionSchema,
   selectDropdownOptionActionSchema,
   getDropdownOptionsActionSchema,
@@ -229,11 +232,13 @@ export class ActionBuilder {
     const done = new Action(async (input: z.infer<typeof doneActionSchema.schema>) => {
       // No ACT_START here. Every other action announces an intent the user can read; this one
       // announced the literal schema name `done`, which reached the panel as a bubble saying
-      // "done" and nothing else. The ACT_OK below carries the actual answer text.
-      this.context.emitEvent(Actors.NAVIGATOR, ExecutionState.ACT_OK, input.text);
+      // "done" and nothing else. The ACT_OK below carries the actual answer text, as plain text.
+      const text = toPlainText(input.text);
+      this.context.emitEvent(Actors.NAVIGATOR, ExecutionState.ACT_OK, text);
       return new ActionResult({
         isDone: true,
-        extractedContent: input.text,
+        success: input.success,
+        extractedContent: text,
       });
     }, doneActionSchema);
     actions.push(done);
@@ -704,6 +709,42 @@ export class ActionBuilder {
       return new ActionResult({ extractedContent: msg, includeInMemory: true });
     }, rememberActionSchema);
     actions.push(remember);
+
+    // Load a skill's procedure from the user's library. The result is pinned: the run follows it
+    // for many steps, and a trimmed procedure would leave the agent half way through a playbook it
+    // can no longer read.
+    const useSkill = new Action(async (input: z.infer<typeof useSkillActionSchema.schema>) => {
+      const name = input.name.trim().replace(/^\//, '').toLowerCase();
+      const intent = input.intent || t('act_useSkill_start', [name]);
+      this.context.emitEvent(Actors.NAVIGATOR, ExecutionState.ACT_START, intent);
+
+      if (this.context.loadedSkills.has(name)) {
+        const msg = t('act_useSkill_already', [name]);
+        this.context.emitEvent(Actors.NAVIGATOR, ExecutionState.ACT_OK, msg);
+        return new ActionResult({ extractedContent: msg, includeInMemory: true });
+      }
+
+      const skill = await skillStore.findEnabled(name);
+      if (!skill) {
+        // Name the real options, so the next step can correct a misspelling instead of guessing.
+        const available = (await skillStore.getEnabled()).map(entry => entry.name).join(', ');
+        const msg = t('act_useSkill_notFound', [name, available || '-']);
+        this.context.emitEvent(Actors.NAVIGATOR, ExecutionState.ACT_OK, msg);
+        return new ActionResult({ extractedContent: msg, includeInMemory: true });
+      }
+
+      this.context.loadedSkills.add(skill.name);
+      void skillStore.markUsed(skill.name).catch(() => undefined);
+      this.context.emitEvent(Actors.NAVIGATOR, ExecutionState.ACT_OK, t('act_useSkill_ok', [skill.name]));
+      // Filtered like a memory: the user's own text, but it may have been imported from elsewhere.
+      const instructions = filterExternalContent(skill.instructions);
+      return new ActionResult({
+        extractedContent: formatSkillInstructions({ name: skill.name, instructions }),
+        includeInMemory: true,
+        pinned: true,
+      });
+    }, useSkillActionSchema);
+    actions.push(useSkill);
 
     // Hand the tab to the user for a step only they can do (login, captcha, verification code).
     // The other direction of the asks-first contract - and the reason credentials never have to

@@ -218,6 +218,17 @@ export const rememberActionSchema: ActionSchema = {
   }),
 };
 
+// Skill Actions
+export const useSkillActionSchema: ActionSchema = {
+  name: 'use_skill',
+  description:
+    'Load the full procedure of a skill listed in the skills catalog, then follow it. Call it alone, as the first action, when a listed skill clearly fits the task. It reads nothing from the page and changes nothing.',
+  schema: z.object({
+    intent: z.string().default('').describe('purpose of this action'),
+    name: z.string().describe('the skill name exactly as listed in the catalog, e.g. "web-research"'),
+  }),
+};
+
 // Parallel Actions
 export const runParallelSubtasksActionSchema: ActionSchema = {
   name: 'run_parallel_subtasks',
