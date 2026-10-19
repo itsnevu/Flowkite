@@ -291,7 +291,7 @@ const SidePanel = () => {
         void handleStopTask();
       }
     },
-    [sendMessage, handleStopTask],
+    [sendMessage, handleStopTask, appendMessage],
   );
 
   const handleBudgetDecision = useCallback(
@@ -314,7 +314,7 @@ const SidePanel = () => {
         void handleStopTask();
       }
     },
-    [sendMessage, handleStopTask],
+    [sendMessage, handleStopTask, appendMessage],
   );
 
   // The $ readouts and the plan card's budget line follow settings live, so a price or budget

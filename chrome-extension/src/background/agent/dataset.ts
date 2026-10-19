@@ -183,6 +183,15 @@ export class TaskDataset {
     return { fields: [...this.fields], rows: this.rows.map(row => [...row]), truncated: this.truncatedFlag };
   }
 
+  /** Rebuild a saved crawl table through the same normalization and deduplication path. */
+  restore(snapshot: DatasetSnapshot): void {
+    this.clear();
+    this.add(
+      snapshot.rows.map(row => Object.fromEntries(snapshot.fields.map((field, index) => [field, row[index] ?? '']))),
+    );
+    this.truncatedFlag ||= snapshot.truncated;
+  }
+
   /** Forget everything. A follow-up task starts its own collection, not a continuation. */
   clear(): void {
     this.fields = [];

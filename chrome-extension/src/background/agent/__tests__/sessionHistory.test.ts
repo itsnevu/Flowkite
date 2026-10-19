@@ -1,63 +1,77 @@
-import { describe, it, expect, vi } from 'vitest';
-import { HumanMessage, AIMessage } from '@langchain/core/messages';
-import { chatHistoryStore, Actors } from '@extension/storage';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { SystemMessage } from '@langchain/core/messages';
+import { chatHistoryStore } from '@extension/storage/lib/chat';
+import { Actors } from '@extension/storage';
+import { Executor } from '../executor';
 import MessageManager from '../messages/service';
+import type { ChatSession, Message } from '@extension/storage';
 
-describe('Session History Context', () => {
-  const sessionId = 'test-session-history-id';
+vi.mock('../../services/analytics', () => ({ analytics: {} }));
+vi.mock('webextension-polyfill', () => ({ default: {} }));
 
-  it('loads prior user prompts and agent outcomes into message manager', async () => {
-    const mockSession = {
-      id: sessionId,
-      title: 'Test Session',
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-      messages: [
-        {
-          id: '1',
-          actor: Actors.USER,
-          content: 'Which city is the capital of France?',
-          timestamp: Date.now(),
-        },
-        {
-          id: '2',
-          actor: Actors.NAVIGATOR,
-          content: 'Paris is the capital of France.',
-          timestamp: Date.now(),
-        },
-      ],
-    };
+const sessionId = 'saved-chat';
+const currentTask = 'Continue';
 
-    vi.spyOn(chatHistoryStore, 'getSession').mockResolvedValue(mockSession as any);
+function message(actor: Actors, content: string): Message {
+  return { actor, content, timestamp: 1 };
+}
 
-    const session = await chatHistoryStore.getSession(sessionId);
-    expect(session).not.toBeNull();
-    expect(session?.messages).toHaveLength(2);
+function setup(messages: Message[]) {
+  vi.spyOn(chatHistoryStore, 'loadCrawlCheckpoint').mockResolvedValue(null);
+  vi.spyOn(chatHistoryStore, 'getSession').mockResolvedValue({ id: sessionId, messages } as ChatSession);
+  const manager = new MessageManager();
+  manager.initTaskMessages(new SystemMessage('System'), currentTask);
+  // Exercise real recovery without constructing browser agents or making model calls.
+  const executor = Object.assign(Object.create(Executor.prototype), {
+    context: { taskId: sessionId, messageManager: manager },
+    tasks: [currentTask],
+    sessionHistoryInjected: false,
+  }) as { injectSessionHistory(): Promise<void> };
+  return { executor, manager };
+}
 
-    const messageManager = new MessageManager();
-    const currentTask = 'What is its population?';
+afterEach(() => vi.restoreAllMocks());
 
-    const previousMessages = session!.messages.filter(msg => {
-      if (!msg.content) return false;
-      const content = msg.content.trim();
-      if (content.startsWith('/') || content.startsWith('Replay of') || content.includes('Replay')) return false;
-      if (content === currentTask.trim()) return false;
-      return (
-        msg.actor === Actors.USER ||
-        msg.actor === Actors.SYSTEM ||
-        msg.actor === Actors.NAVIGATOR ||
-        msg.actor === Actors.PLANNER
-      );
-    });
+describe('session history recovery', () => {
+  it('restores saved exchanges before the current instruction, once per executor', async () => {
+    const { executor, manager } = setup([
+      message(Actors.USER, 'Find flights to Lisbon'),
+      message(Actors.SYSTEM, 'Found a flight for $120'),
+      message(Actors.USER, currentTask),
+    ]);
+    await executor.injectSessionHistory();
+    await executor.injectSessionHistory();
+    expect(chatHistoryStore.getSession).toHaveBeenCalledTimes(1);
+    expect(chatHistoryStore.getSession).toHaveBeenCalledWith(sessionId);
+    const contents = manager.getMessages().map(msg => String(msg.content));
+    const restored = contents.findIndex(content => content.includes('Previous outcome: Found a flight'));
+    const current = contents.findIndex(content => content.includes('Your ultimate task is:'));
+    expect(restored).toBeGreaterThan(0);
+    expect(restored).toBeLessThan(current);
+  });
 
-    for (const msg of previousMessages) {
-      if (msg.actor === Actors.USER) {
-        messageManager.addMessageWithTokens(new HumanMessage({ content: msg.content }));
-      } else {
-        messageManager.addMessageWithTokens(new AIMessage({ content: msg.content }));
-      }
-    }
+  it('keeps previous repeated prompts and legitimate text mentioning Replay', async () => {
+    const { executor, manager } = setup([
+      message(Actors.USER, currentTask),
+      message(Actors.SYSTEM, 'Replay is the name of the product. It costs $20.'),
+      message(Actors.USER, currentTask),
+    ]);
+    await executor.injectSessionHistory();
+    const contents = manager.getMessages().map(msg => String(msg.content));
+    expect(contents.some(content => content.includes('Previous user prompt in this session:'))).toBe(true);
+    expect(contents.some(content => content.includes('Previous outcome: Replay is the name'))).toBe(true);
+  });
 
-    expect(messageManager.length()).toBe(2);
+  it('excludes replay commands and the latest prompt without losing earlier outcomes', async () => {
+    const { executor, manager } = setup([
+      message(Actors.USER, '/replay old-chat'),
+      message(Actors.SYSTEM, 'Previously completed'),
+      message(Actors.USER, currentTask),
+    ]);
+    await executor.injectSessionHistory();
+    const contents = manager.getMessages().map(msg => String(msg.content));
+    expect(contents.some(content => content.includes('/replay old-chat'))).toBe(false);
+    expect(contents.filter(content => content.includes('Previous user prompt'))).toHaveLength(0);
+    expect(contents.some(content => content.includes('Previous outcome: Previously completed'))).toBe(true);
   });
 });

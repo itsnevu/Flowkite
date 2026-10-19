@@ -121,7 +121,21 @@ export interface ChatTokenUsage {
   unreportedCalls: number;
 }
 
+/** Durable progress for a bounded, read-only crawl in this chat. */
+export interface CrawlCheckpoint {
+  version: 1;
+  discoveryTruncated?: boolean;
+  key: string;
+  queue: Array<{ url: string; depth: number }>;
+  completed: string[];
+  failed: Array<{ url: string; error: string }>;
+  dataset: MessageDataset;
+  updatedAt: number;
+}
+
 export interface ChatHistoryStorage {
+  loadCrawlCheckpoint: (sessionId: string) => Promise<CrawlCheckpoint | null>;
+  storeCrawlCheckpoint: (sessionId: string, checkpoint: CrawlCheckpoint) => Promise<void>;
   // Get all chat sessions (with empty message arrays for listing)
   getAllSessions: () => Promise<ChatSession[]>;
 

@@ -203,24 +203,15 @@ function mergeSuccessiveMessages(
       streak += 1;
       if (streak > 1) {
         const lastMessage = mergedMessages[mergedMessages.length - 1];
-        if (Array.isArray(message.content)) {
-          // Handle array content case
-          if (typeof lastMessage.content === 'string') {
-            const textContent = message.content.find(
-              item => typeof item === 'object' && 'type' in item && item.type === 'text',
-            );
-            if (textContent && 'text' in textContent) {
-              lastMessage.content += textContent.text;
-            }
-          }
+        if (typeof lastMessage.content === 'string' && typeof message.content === 'string') {
+          lastMessage.content += `\n${message.content}`;
         } else {
-          // Handle string content case
-          if (typeof lastMessage.content === 'string' && typeof message.content === 'string') {
-            lastMessage.content += message.content;
-          }
+          const blocks = (content: typeof message.content) =>
+            typeof content === 'string' ? [{ type: 'text' as const, text: content }] : content;
+          lastMessage.content = [...blocks(lastMessage.content), ...blocks(message.content)];
         }
       } else {
-        mergedMessages.push(message);
+        mergedMessages.push(new classToMerge({ ...message, content: message.content }));
       }
     } else {
       mergedMessages.push(message);

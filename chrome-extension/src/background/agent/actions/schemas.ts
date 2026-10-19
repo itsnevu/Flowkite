@@ -123,7 +123,7 @@ export const closeTabActionSchema: ActionSchema = {
 export const extractContentActionSchema: ActionSchema = {
   name: 'extract_content',
   description:
-    'Extract specific information from the current page with a dedicated reader model, e.g. all product names with prices, every row of a listing, all links about a topic. State the goal precisely. Prefer this over reading the raw DOM when the answer is spread across a long page, and format tabular results as a markdown table.',
+    'Answer a specific question about the current page with a dedicated reader model. For repeated records the user wants to save, use extract_structured or crawl_pages instead. State the goal precisely. Prefer this over reading the raw DOM when the answer is spread across a long page, and format tabular results as a markdown table.',
   schema: z.object({
     intent: z.string().default('').describe('purpose of this action'),
     goal: z.string().describe('what to extract, stated precisely'),
@@ -154,6 +154,29 @@ export const extractStructuredActionSchema: ActionSchema = {
       .min(1)
       .max(12)
       .describe('the columns to fill for every record; keep the same columns on every page of one task'),
+  }),
+};
+
+export const crawlPagesActionSchema: ActionSchema = {
+  name: 'crawl_pages',
+  description:
+    'Crawl linked pages on one site into a downloadable dataset, saving a durable URL queue and rows after every page. Repeating the same goal, fields and URL resumes its checkpoint. Use for catalogs, directories and documentation indexes. Stops at login, limits or cancellation and reports incomplete coverage honestly. For button-based pagination or infinite scrolling, use the interactive browser tools instead.',
+  schema: z.object({
+    intent: z.string().default(''),
+    url: z.string().url().describe('Starting listing or index URL'),
+    goal: z.string().min(1).max(1000),
+    fields: z
+      .array(z.string().min(1).max(60))
+      .min(1)
+      .max(11)
+      .describe('Stable column names; source_url is added automatically'),
+    max_pages: z.number().int().min(1).max(50).default(10),
+    max_depth: z.number().int().min(0).max(3).default(2),
+    link_pattern: z
+      .string()
+      .max(200)
+      .default('')
+      .describe('Only follow links containing this text, e.g. /products/; choose a scope matching the user request'),
   }),
 };
 
@@ -244,8 +267,7 @@ export const scrollToBottomActionSchema: ActionSchema = {
 
 export const previousPageActionSchema: ActionSchema = {
   name: 'previous_page',
-  description:
-    'Scroll the document in the window or an element to the previous page. If no index is specified, scroll the whole document.',
+  description: 'Scroll up by one viewport. This does NOT open the previous listing page or navigate browser history.',
   schema: z.object({
     intent: z.string().default('').describe('purpose of this action'),
     index: z.number().int().nullable().optional().describe('index of the element'),
@@ -255,7 +277,7 @@ export const previousPageActionSchema: ActionSchema = {
 export const nextPageActionSchema: ActionSchema = {
   name: 'next_page',
   description:
-    'Scroll the document in the window or an element to the next page. If no index is specified, scroll the whole document.',
+    'Scroll down by one viewport. This does NOT click Next, follow a link, or advance listing pagination. To open page 2, use click_element on the actual Next control or go_to_url with its observed URL.',
   schema: z.object({
     intent: z.string().default('').describe('purpose of this action'),
     index: z.number().int().nullable().optional().describe('index of the element'),

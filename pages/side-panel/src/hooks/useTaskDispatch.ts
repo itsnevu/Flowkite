@@ -1,7 +1,7 @@
 import { Actors, chatHistoryStore } from '@extension/storage';
 import { t } from '@extension/i18n';
 import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
-import type { ApprovalMode, Message } from '@extension/storage';
+import type { ApprovalMode, PendingUpload, Message } from '@extension/storage';
 import type { ActionConfirmationPayload, PlanReviewPayload } from '../types/event';
 import type { LiveStatus } from '../types/status';
 
@@ -246,7 +246,11 @@ export const useTaskDispatch = ({
    * @returns whether the text was accepted - false means the composer should keep the draft,
    * because nothing was sent and nothing consumed it.
    */
-  const handleSendMessage = async (text: string, displayText?: string): Promise<boolean> => {
+  const handleSendMessage = async (
+    text: string,
+    displayText?: string,
+    images: PendingUpload[] = [],
+  ): Promise<boolean> => {
     // Trim the input text first
     const trimmedText = text.trim();
 
@@ -272,7 +276,7 @@ export const useTaskDispatch = ({
     if (taskRunning) {
       appendMessage({ actor: Actors.USER, content: displayText || text, timestamp: Date.now() }, sessionIdRef.current);
       try {
-        await sendMessage({ type: 'steer', task: text, taskId: sessionIdRef.current });
+        await sendMessage({ type: 'steer', task: text, taskId: sessionIdRef.current, images });
       } catch (err) {
         appendMessage({
           actor: Actors.SYSTEM,
@@ -340,6 +344,7 @@ export const useTaskDispatch = ({
           taskId: sessionIdRef.current,
           tabId,
           approvalMode,
+          images,
         });
       } else {
         // Send as new task
@@ -349,6 +354,7 @@ export const useTaskDispatch = ({
           taskId: sessionIdRef.current,
           tabId,
           approvalMode,
+          images,
         });
       }
       return true;

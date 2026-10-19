@@ -171,7 +171,7 @@
     "message": "再次使用這個任務"
   },
   "chat_history_continueNote": {
-    "message": "在這裡傳送訊息會以新任務接續這個已儲存的對話；代理程式會重新開始，不會記得先前的執行內容"
+    "message": "使用已儲存的歷史記錄繼續此對話。"
   },
   "chat_history_taskStillRunning": {
     "message": "即時對話中仍有任務在執行。請回到該對話傳送修正，或先停止它再在這裡開始新任務。"
@@ -2346,5 +2346,26 @@
   },
   "chat_feedback_report": {
     "message": "告訴我們哪裡出錯了"
+  },
+  "chat_attach_imagePrompt": {
+    "message": "請描述附加的圖片。"
+  },
+  "chat_attach_sendFailed": {
+    "message": "無法傳送附件。草稿已保留，請重試。"
+  },
+  "chat_attach_reading": {
+    "message": "正在讀取附件…"
+  },
+  "chat_input_steerHint": {
+    "message": "代理執行時，您仍可傳送修正指示。"
+  },
+  "chat_attach_hint": {
+    "message": "貼上圖片、拖放檔案，或使用附件按鈕。"
+  },
+  "act_crawl_start": {
+    "message": "正在擷取連結頁面"
+  },
+  "act_crawl_result": {
+    "message": "擷取進度：已讀取 $1 頁、收集 $2 筆、待處理 $3 個網址、失敗 $4 頁。"
   }
 }

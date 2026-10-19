@@ -733,6 +733,21 @@ export default class Page {
     return this._puppeteerPage.evaluate(readVisibleTextWithoutOverlay);
   }
 
+  /** Links are read as DOM data; no page script is executed or followed here. */
+  async getCrawlLinks(): Promise<{ links: string[]; requiresLogin: boolean; linksTruncated: boolean }> {
+    if (!this._puppeteerPage) throw new Error('Puppeteer page is not connected');
+    return this._puppeteerPage.evaluate(() => ({
+      linksTruncated: document.querySelectorAll('a[href]').length > 500,
+      links: Array.from(document.querySelectorAll<HTMLAnchorElement>('a[href]'))
+        .filter(link => link.getClientRects().length > 0 && !link.hasAttribute('download'))
+        .slice(0, 500)
+        .map(link => link.href),
+      requiresLogin: Array.from(document.querySelectorAll<HTMLInputElement>('input[type="password"]')).some(
+        input => input.getClientRects().length > 0,
+      ),
+    }));
+  }
+
   getCachedState(): PageState | null {
     return this._cachedState;
   }

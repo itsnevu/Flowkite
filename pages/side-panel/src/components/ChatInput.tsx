@@ -2,15 +2,26 @@ import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { FaMicrophone, FaPaperclip, FaArrowUp, FaTimes } from 'react-icons/fa';
 import { AiOutlineLoading3Quarters } from 'react-icons/ai';
 import { t } from '@extension/i18n';
-import { uploadsStore, rejectionReason, MAX_UPLOAD_FILE_BYTES } from '@extension/storage';
+import {
+  uploadsStore,
+  rejectionReason,
+  MAX_UPLOAD_FILE_BYTES,
+  MAX_UPLOAD_FILES,
+  isImageUpload,
+} from '@extension/storage';
 import { findPlaceholders, nextPlaceholder } from '../templates';
+import { droppedImageUrl, readDroppedImage } from '../attachmentTransfer';
 import ApprovalModePicker from './ApprovalModePicker';
-import type { ApprovalMode } from '@extension/storage';
+import type { ApprovalMode, PendingUpload } from '@extension/storage';
 import type { PlaceholderSpan } from '../templates';
 
 interface ChatInputProps {
   /** false (sync or async) means the text was refused and the composer must keep the draft */
-  onSendMessage: (text: string, displayText?: string) => void | boolean | Promise<void | boolean>;
+  onSendMessage: (
+    text: string,
+    displayText?: string,
+    images?: PendingUpload[],
+  ) => void | boolean | Promise<void | boolean>;
   onStopTask: () => void;
   onMicClick?: () => void;
   isRecording?: boolean;
@@ -87,20 +98,34 @@ export default function ChatInput({
   approvalMode,
   onApprovalModeSelect,
 }: ChatInputProps) {
+  const inputDisabled = disabled && !showStopButton;
+  const [readingFiles, setReadingFiles] = useState(false);
+  const [sending, setSending] = useState(false);
+  const attachmentQueue = useRef<Promise<void>>(Promise.resolve());
+  const attachedFilesRef = useRef<AttachedFile[]>([]);
+  const submitting = useRef(false);
+  const pendingReads = useRef(0);
+  const draftVersion = useRef(0);
   const [text, setText] = useState('');
   const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
   const [attachError, setAttachError] = useState<string | null>(null);
   /** Unfilled template slots in the draft. While any remain, send is held and Tab walks them. */
   const placeholders = useMemo(() => findPlaceholders(text), [text]);
   const isSendButtonDisabled = useMemo(
-    () => disabled || placeholders.length > 0 || (text.trim() === '' && attachedFiles.length === 0),
-    [disabled, placeholders, text, attachedFiles],
+    () =>
+      inputDisabled ||
+      readingFiles ||
+      sending ||
+      placeholders.length > 0 ||
+      (text.trim() === '' && attachedFiles.length === 0),
+    [inputDisabled, readingFiles, sending, placeholders, text, attachedFiles],
   );
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Handle text changes and resize textarea
   const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    draftVersion.current += 1;
     const newText = e.target.value;
     setText(newText);
 
@@ -127,6 +152,7 @@ export default function ChatInput({
    * template slot if the text is a template, at the end if it is not.
    */
   const applyExternalText = useCallback((newText: string) => {
+    draftVersion.current += 1;
     setText(newText);
     // After React has flushed the new value into the textarea; selection needs the real DOM text.
     requestAnimationFrame(() => {
@@ -161,8 +187,9 @@ export default function ChatInput({
   }, []);
 
   const handleSubmit = useCallback(
-    (e: React.FormEvent) => {
+    async (e: React.FormEvent) => {
       e.preventDefault();
+      if (inputDisabled || submitting.current || readingFiles) return;
       const trimmedText = text.trim();
 
       // A template with unfilled slots is not a task yet. Enter lands the user on the first
@@ -173,61 +200,79 @@ export default function ChatInput({
       }
 
       if (trimmedText || attachedFiles.length > 0) {
-        let messageContent = trimmedText;
-        let displayContent = trimmedText;
+        const submittedVersion = draftVersion.current;
+        submitting.current = true;
+        setSending(true);
+        try {
+          let messageContent = trimmedText;
+          let displayContent = trimmedText;
 
-        // Security: Clearly separate user input from file content
-        // The background service will sanitize file content using guardrails
-        const textFiles = attachedFiles.filter(file => file.role === 'text');
-        const uploadFiles = attachedFiles.filter(file => file.role === 'upload');
+          // Security: Clearly separate user input from file content
+          // The background service will sanitize file content using guardrails
+          const textFiles = attachedFiles.filter(file => file.role === 'text');
+          const uploadFiles = attachedFiles.filter(file => file.role === 'upload');
 
-        // Written before the task is sent, so the action can never race the panel and find the
-        // store still empty. Replaces rather than appends: these belong to the task being sent.
-        // Skipped for an attachment-less send while a task runs - that is a steering correction,
-        // and wiping the store there took away the very file the running task was about to upload.
-        if (uploadFiles.length > 0 || !showStopButton) {
-          void uploadsStore.setFiles(
-            uploadFiles.map(file => ({ name: file.name, mimeType: file.type, data: file.content, size: file.size })),
-          );
-        }
+          // Written before the task is sent, so the action can never race the panel and find the
+          // store still empty. Replaces rather than appends: these belong to the task being sent.
+          // Skipped for an attachment-less send while a task runs - that is a steering correction,
+          // and wiping the store there took away the very file the running task was about to upload.
+          if (uploadFiles.length > 0 || !showStopButton) {
+            await (showStopButton ? uploadsStore.appendFiles : uploadsStore.setFiles)(
+              uploadFiles.map(file => ({ name: file.name, mimeType: file.type, data: file.content, size: file.size })),
+            );
+          }
 
-        if (textFiles.length > 0) {
-          const fileContents = textFiles
-            .map(file => {
-              // Tag file content for background service to identify and sanitize
-              return `\n\n<flowkite_file_content type="file" name="${file.name}">\n${file.content}\n</flowkite_file_content>`;
-            })
-            .join('\n');
+          if (textFiles.length > 0) {
+            const fileContents = textFiles
+              .map(file => {
+                // Tag file content for background service to identify and sanitize
+                return `\n\n<flowkite_file_content type="file" name="${file.name}">\n${file.content}\n</flowkite_file_content>`;
+              })
+              .join('\n');
 
-          // Combine user message with tagged file content (for background service)
-          messageContent = trimmedText
-            ? `${trimmedText}\n\n<flowkite_attached_files>${fileContents}</flowkite_attached_files>`
-            : `<flowkite_attached_files>${fileContents}</flowkite_attached_files>`;
-        }
+            // Combine user message with tagged file content (for background service)
+            messageContent = trimmedText
+              ? `${trimmedText}\n\n<flowkite_attached_files>${fileContents}</flowkite_attached_files>`
+              : `<flowkite_attached_files>${fileContents}</flowkite_attached_files>`;
+          }
 
-        // The model is told the names and nothing else. It cannot read these files, and saying so
-        // outright is cheaper than letting it discover that by trying.
-        if (uploadFiles.length > 0) {
-          const names = uploadFiles.map(file => file.name).join(', ');
-          messageContent = `${messageContent}\n\n<flowkite_attached_uploads>${names}</flowkite_attached_uploads>`;
-        }
+          // The model is told the names and nothing else. It cannot read these files, and saying so
+          // outright is cheaper than letting it discover that by trying.
+          if (uploadFiles.length > 0) {
+            const names = uploadFiles.map(file => file.name).join(', ');
+            messageContent = `${messageContent}\n\n<flowkite_attached_uploads>${names}</flowkite_attached_uploads>`;
+          }
 
-        if (attachedFiles.length > 0) {
-          const fileList = attachedFiles.map(file => `📎 ${file.name}`).join('\n');
-          displayContent = trimmedText ? `${trimmedText}\n\n${fileList}` : fileList;
-        }
+          if (attachedFiles.length > 0) {
+            const fileList = attachedFiles.map(file => `📎 ${file.name}`).join('\n');
+            displayContent = trimmedText ? `${trimmedText}\n\n${fileList}` : fileList;
+          }
 
-        // The draft is cleared only once the send is accepted: a refusal (a task still running in
-        // a stored chat, a dead connection) must hand the user their text back, not eat it.
-        void Promise.resolve(onSendMessage(messageContent, displayContent)).then(accepted => {
+          const images = uploadFiles
+            .map(file => ({ name: file.name, mimeType: file.type, data: file.content, size: file.size }))
+            .filter(isImageUpload);
+          if (!trimmedText && textFiles.length === 0 && images.length > 0) {
+            messageContent = `${t('chat_attach_imagePrompt')}\n\n${messageContent}`;
+          }
+
+          // The draft is cleared only once the send is accepted: a refusal (a task still running in
+          // a stored chat, a dead connection) must hand the user their text back, not eat it.
+          const accepted = await onSendMessage(messageContent, displayContent, images);
+
           if (accepted === false) return;
-          setText('');
+          if (draftVersion.current === submittedVersion) setText('');
+          attachedFilesRef.current = [];
           setAttachedFiles([]);
           setAttachError(null);
-        });
+        } catch {
+          setAttachError(t('chat_attach_sendFailed'));
+        } finally {
+          submitting.current = false;
+          setSending(false);
+        }
       }
     },
-    [text, placeholders, selectSpan, attachedFiles, onSendMessage, showStopButton],
+    [text, placeholders, selectSpan, attachedFiles, onSendMessage, showStopButton, inputDisabled, readingFiles],
   );
 
   const handleKeyDown = useCallback(
@@ -264,66 +309,130 @@ export default function ChatInput({
     fileInputRef.current?.click();
   }, []);
 
+  const addFiles = useCallback(
+    (files: File[]) => {
+      if (inputDisabled || files.length === 0 || submitting.current) return Promise.resolve();
+      if (files.length + attachedFilesRef.current.length > MAX_UPLOAD_FILES) {
+        setAttachError(t('chat_attach_tooMuch'));
+        return Promise.resolve();
+      }
+      pendingReads.current += 1;
+      setReadingFiles(true);
+      const read = attachmentQueue.current.then(async () => {
+        const newFiles: AttachedFile[] = [];
+        const rejected: string[] = [];
+
+        for (let i = 0; i < files.length; i++) {
+          const file = files[i];
+          const fileExt = '.' + file.name.split('.').pop()?.toLowerCase();
+          const isText = TEXT_EXTENSIONS.includes(fileExt);
+
+          // Text goes into the prompt, so it is held to the old 1 MB line; an upload never enters the
+          // context at all, so it is held to the session-storage budget instead.
+          const limit = isText ? 1024 * 1024 : MAX_UPLOAD_FILE_BYTES;
+          if (file.size === 0 || file.size > limit) {
+            rejected.push(file.name);
+            continue;
+          }
+
+          try {
+            newFiles.push({
+              name: file.name,
+              content: isText ? await file.text() : toBase64(await file.arrayBuffer()),
+              type:
+                file.type ||
+                ({
+                  '.png': 'image/png',
+                  '.jpg': 'image/jpeg',
+                  '.jpeg': 'image/jpeg',
+                  '.webp': 'image/webp',
+                  '.gif': 'image/gif',
+                }[fileExt] ??
+                  (isText ? 'text/plain' : 'application/octet-stream')),
+              role: isText ? 'text' : 'upload',
+              size: file.size,
+            });
+          } catch (error) {
+            console.error(`Error reading file ${file.name}:`, error);
+            rejected.push(file.name);
+          }
+        }
+
+        const merged = [...attachedFilesRef.current, ...newFiles];
+        const uploads = merged;
+        // Checked against the merged set rather than this batch, or three separate drops of 3 MB each
+        // would each pass on their own and together overrun the store.
+        const overflow = rejectionReason(
+          uploads.map(file => ({ name: file.name, mimeType: file.type, data: file.content, size: file.size })),
+        );
+
+        if (overflow) {
+          setAttachError(t('chat_attach_tooMuch'));
+        } else {
+          attachedFilesRef.current = merged;
+          setAttachedFiles(merged);
+          setAttachError(rejected.length ? t('chat_attach_rejected', [rejected.join(', ')]) : null);
+        }
+      });
+      attachmentQueue.current = read.catch(() => setAttachError(t('chat_attach_sendFailed')));
+      return attachmentQueue.current.finally(() => {
+        pendingReads.current -= 1;
+        setReadingFiles(pendingReads.current > 0);
+      });
+    },
+    [inputDisabled],
+  );
+
   const handleFileChange = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
-      const files = e.target.files;
-      if (!files || files.length === 0) return;
+      const files = Array.from(e.target.files ?? []);
+      e.target.value = '';
+      await addFiles(files);
+    },
+    [addFiles],
+  );
 
-      const newFiles: AttachedFile[] = [];
-      const rejected: string[] = [];
-
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        const fileExt = '.' + file.name.split('.').pop()?.toLowerCase();
-        const isText = TEXT_EXTENSIONS.includes(fileExt);
-
-        // Text goes into the prompt, so it is held to the old 1 MB line; an upload never enters the
-        // context at all, so it is held to the session-storage budget instead.
-        const limit = isText ? 1024 * 1024 : MAX_UPLOAD_FILE_BYTES;
-        if (file.size > limit) {
-          rejected.push(file.name);
-          continue;
-        }
-
-        try {
-          newFiles.push({
-            name: file.name,
-            content: isText ? await file.text() : toBase64(await file.arrayBuffer()),
-            type: file.type || (isText ? 'text/plain' : 'application/octet-stream'),
-            role: isText ? 'text' : 'upload',
-            size: file.size,
-          });
-        } catch (error) {
-          console.error(`Error reading file ${file.name}:`, error);
-          rejected.push(file.name);
+  const handlePaste = useCallback(
+    async (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+      const files = Array.from(e.clipboardData.files);
+      if (files.length === 0) {
+        for (const item of Array.from(e.clipboardData.items)) {
+          const file = item.kind === 'file' ? item.getAsFile() : null;
+          if (file) files.push(file);
         }
       }
+      if (files.length === 0) return;
+      e.preventDefault();
+      await addFiles(files);
+    },
+    [addFiles],
+  );
 
-      const merged = [...attachedFiles, ...newFiles];
-      const uploads = merged.filter(file => file.role === 'upload');
-      // Checked against the merged set rather than this batch, or three separate drops of 3 MB each
-      // would each pass on their own and together overrun the store.
-      const overflow = rejectionReason(
-        uploads.map(file => ({ name: file.name, mimeType: file.type, data: file.content, size: file.size })),
-      );
-
-      if (overflow) {
-        setAttachError(t('chat_attach_tooMuch'));
-      } else {
-        setAttachedFiles(merged);
-        setAttachError(rejected.length ? t('chat_attach_rejected', [rejected.join(', ')]) : null);
-      }
-
-      // Reset file input
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
+  const handleDrop = useCallback(
+    async (e: React.DragEvent<HTMLFormElement>) => {
+      e.preventDefault();
+      if (inputDisabled || submitting.current) return;
+      const files = Array.from(e.dataTransfer.files);
+      if (files.length > 0) return addFiles(files);
+      const url = droppedImageUrl(e.dataTransfer);
+      if (!url) return;
+      pendingReads.current += 1;
+      setReadingFiles(true);
+      try {
+        await addFiles([await readDroppedImage(url)]);
+      } catch {
+        setAttachError(t('chat_attach_sendFailed'));
+      } finally {
+        pendingReads.current -= 1;
+        setReadingFiles(pendingReads.current > 0);
       }
     },
-    [attachedFiles],
+    [addFiles, inputDisabled],
   );
 
   const handleRemoveFile = useCallback((index: number) => {
-    setAttachedFiles(prev => prev.filter((_, i) => i !== index));
+    attachedFilesRef.current = attachedFilesRef.current.filter((_, i) => i !== index);
+    setAttachedFiles(attachedFilesRef.current);
     setAttachError(null);
   }, []);
 
@@ -332,7 +441,13 @@ export default function ChatInput({
       {/* The composer is a well pressed into the canvas; focusing it deepens the well. */}
       <form
         onSubmit={handleSubmit}
-        className={`rounded-slab bg-canvas-sunk p-2.5 shadow-neu-inset-sm transition-shadow duration-200 ease-press focus-within:shadow-neu-inset ${disabled ? 'cursor-not-allowed' : ''}`}
+        onDragOver={e => {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = inputDisabled ? 'none' : 'copy';
+        }}
+        onDrop={handleDrop}
+        className={`rounded-slab bg-canvas-sunk p-2.5 shadow-neu-inset-sm transition-shadow duration-200 ease-press focus-within:shadow-neu-inset ${inputDisabled ? 'cursor-not-allowed' : ''}`}
+        aria-busy={readingFiles || sending}
         aria-label={t('chat_input_form')}>
         <div className="flex flex-col gap-2">
           {attachError && (
@@ -348,6 +463,13 @@ export default function ChatInput({
                 <div
                   key={index}
                   className="flex items-center gap-1.5 rounded-pill bg-canvas-raised px-3 py-1 text-xs text-ink-soft shadow-neu-sm">
+                  {isImageUpload({ mimeType: file.type }) && (
+                    <img
+                      src={`data:${file.type};base64,${file.content}`}
+                      alt={file.name}
+                      className="size-9 rounded-soft object-cover"
+                    />
+                  )}
                   <FaPaperclip
                     className={`size-2.5 shrink-0 ${file.role === 'upload' ? 'text-accent' : 'text-ink-faint'}`}
                     aria-hidden="true"
@@ -374,8 +496,9 @@ export default function ChatInput({
             value={text}
             onChange={handleTextChange}
             onKeyDown={handleKeyDown}
-            disabled={disabled}
-            aria-disabled={disabled}
+            onPaste={handlePaste}
+            disabled={inputDisabled}
+            aria-disabled={inputDisabled}
             rows={5}
             className="w-full resize-none bg-transparent px-1.5 py-1 text-sm leading-relaxed text-ink placeholder:text-ink-faint focus:outline-none disabled:cursor-not-allowed disabled:text-ink-faint"
             placeholder={
@@ -388,6 +511,14 @@ export default function ChatInput({
             aria-label={t('chat_input_editor')}
           />
 
+          <p className="px-1.5 text-[10px] leading-tight text-ink-faint" role="note">
+            {readingFiles
+              ? t('chat_attach_reading')
+              : showStopButton
+                ? t('chat_input_steerHint')
+                : t('chat_attach_hint')}
+          </p>
+
           {/* Visible exactly while send is held for unfilled slots, so the hold explains itself. */}
           {placeholders.length > 0 && (
             <p className="px-1.5 text-[10px] leading-tight text-ink-faint" role="note">
@@ -395,9 +526,7 @@ export default function ChatInput({
             </p>
           )}
 
-          {/* A stored chat accepts new prompts, but the agent starts without the old run's context
-              - said here, before the user types, rather than discovered mid-task. Hidden while a
-              task runs: a send then is refused with its own explanation, not a continuation. */}
+          {/* Continuing a saved conversation restores its persisted context. */}
           {isHistoricalSession && !showStopButton && (
             <p className="px-1.5 text-[10px] leading-tight text-ink-faint" role="note">
               {t('chat_history_continueNote')}
@@ -419,10 +548,10 @@ export default function ChatInput({
               <button
                 type="button"
                 onClick={handleFileSelect}
-                disabled={disabled}
+                disabled={inputDisabled}
                 aria-label={t('chat_attach_a11y')}
                 title={t('chat_attach_tooltip')}
-                className={`${ICON_BUTTON} ${disabled ? DISABLED_CONTROL : ICON_BUTTON_IDLE}`}>
+                className={`${ICON_BUTTON} ${inputDisabled ? DISABLED_CONTROL : ICON_BUTTON_IDLE}`}>
                 <FaPaperclip className="size-4" aria-hidden="true" />
               </button>
 
@@ -441,7 +570,7 @@ export default function ChatInput({
                 <button
                   type="button"
                   onClick={onMicClick}
-                  disabled={disabled || isProcessingSpeech}
+                  disabled={inputDisabled || isProcessingSpeech}
                   aria-label={
                     isProcessingSpeech
                       ? t('chat_stt_processing')
@@ -450,7 +579,7 @@ export default function ChatInput({
                         : t('chat_stt_input_start')
                   }
                   className={`${ICON_BUTTON} ${
-                    disabled || isProcessingSpeech
+                    inputDisabled || isProcessingSpeech
                       ? DISABLED_CONTROL
                       : isRecording
                         ? ICON_BUTTON_PRESSED

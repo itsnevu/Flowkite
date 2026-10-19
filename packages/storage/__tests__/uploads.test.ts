@@ -72,3 +72,24 @@ describe('uploadsStore', () => {
     expect(await uploadsStore.listNames()).toEqual([]);
   });
 });
+
+describe('vision attachment validation', () => {
+  it('accepts supported image bytes and rejects SVG, remote URLs and incorrect sizes', async () => {
+    const { readTaskImages } = await import('../lib/attachments/uploads');
+    const image = { name: 'photo.png', mimeType: 'image/png', data: 'iVBORw==', size: 4 };
+    expect(readTaskImages([image])).toEqual([image]);
+    expect(readTaskImages(undefined)).toEqual([]);
+    for (const invalid of [
+      { ...image, mimeType: 'image/svg+xml' },
+      { ...image, data: 'https://remote.test/photo.png' },
+      { ...image, size: 1 },
+      { ...image, data: '', size: 0 },
+    ])
+      expect(() => readTaskImages([invalid])).toThrow();
+  });
+  it('preserves the running task uploads when a correction adds another file', async () => {
+    await uploadsStore.setFiles([file('first.pdf')]);
+    await uploadsStore.appendFiles([file('second.png')]);
+    expect(await uploadsStore.listNames()).toEqual(['first.pdf', 'second.png']);
+  });
+});

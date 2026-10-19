@@ -2,6 +2,7 @@ import { createStorage } from '../base/base';
 import { StorageEnum } from '../base/enums';
 import type {
   ChatSession,
+  CrawlCheckpoint,
   ChatMessage,
   ChatHistoryStorage,
   Message,
@@ -97,12 +98,21 @@ const removeSessionKeys = async (sessionId: string): Promise<void> => {
     getSessionMessagesKey(sessionId),
     getSessionTokenUsageKey(sessionId),
     getSessionAgentStepHistoryKey(sessionId),
+    `chat_crawl_${sessionId}`,
   ];
   for (const key of keys) {
     sessionStorageCache.delete(key);
   }
   await globalThis.chrome?.storage?.local?.remove(keys);
 };
+
+const getCrawlCheckpointStorage = (sessionId: string) =>
+  cached(`chat_crawl_${sessionId}`, () =>
+    createStorage<CrawlCheckpoint | null>(`chat_crawl_${sessionId}`, null, {
+      storageEnum: StorageEnum.Local,
+      liveUpdate: true,
+    }),
+  );
 
 // Helper function to get current timestamp in milliseconds
 const getCurrentTimestamp = (): number => Date.now();
@@ -112,6 +122,16 @@ const getCurrentTimestamp = (): number => Date.now();
  */
 export function createChatHistoryStorage(): ChatHistoryStorage {
   return {
+    loadCrawlCheckpoint: async (sessionId: string) => {
+      const sessions = await chatSessionsMetaStorage.get();
+      if (!sessions.some(session => session.id === sessionId)) return null;
+      return getCrawlCheckpointStorage(sessionId).get();
+    },
+    storeCrawlCheckpoint: async (sessionId: string, checkpoint: CrawlCheckpoint) => {
+      const sessions = await chatSessionsMetaStorage.get();
+      if (!sessions.some(session => session.id === sessionId)) throw new Error('Chat session no longer exists');
+      await getCrawlCheckpointStorage(sessionId).set(checkpoint);
+    },
     getAllSessions: async (): Promise<ChatSession[]> => {
       const sessionsMeta = await chatSessionsMetaStorage.get();
 

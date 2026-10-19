@@ -171,7 +171,7 @@
     "message": "Use this task again"
   },
   "chat_history_continueNote": {
-    "message": "Sending here continues this saved chat as a new task; the agent starts fresh and does not remember the earlier run"
+    "message": "Continue this conversation using its saved history."
   },
   "chat_history_taskStillRunning": {
     "message": "A task is still running in the live chat. Go back to it to send corrections, or stop it before starting a task here."
@@ -2346,5 +2346,26 @@
   },
   "chat_feedback_report": {
     "message": "Tell us what went wrong"
+  },
+  "chat_attach_imagePrompt": {
+    "message": "Describe the attached image(s)."
+  },
+  "chat_attach_sendFailed": {
+    "message": "Could not send the attachments. Your draft is still here; try again."
+  },
+  "chat_attach_reading": {
+    "message": "Reading attachments…"
+  },
+  "chat_input_steerHint": {
+    "message": "You can send a correction while the agent works."
+  },
+  "chat_attach_hint": {
+    "message": "Paste an image, drop files here, or use the attachment button."
+  },
+  "act_crawl_start": {
+    "message": "Crawling linked pages"
+  },
+  "act_crawl_result": {
+    "message": "Crawl progress: $1 pages read, $2 rows collected, $3 URLs pending, $4 pages failed."
   }
 }

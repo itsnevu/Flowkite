@@ -27,6 +27,41 @@ export interface PendingUpload {
   size: number;
 }
 
+/** Formats accepted by the vision input; SVG and arbitrary data URLs never reach a model. */
+export const IMAGE_MIME_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif'] as const;
+
+export function isImageUpload(file: Pick<PendingUpload, 'mimeType'>): boolean {
+  return (IMAGE_MIME_TYPES as readonly string[]).includes(file.mimeType);
+}
+
+/** Validate the attachment payload at the worker's message boundary. */
+export function readTaskImages(value: unknown): PendingUpload[] {
+  if (value === undefined) return [];
+  if (!Array.isArray(value) || value.length > MAX_UPLOAD_FILES) throw new Error('Invalid image attachments');
+  const files: PendingUpload[] = [];
+  for (const file of value) {
+    if (
+      !file ||
+      typeof file !== 'object' ||
+      typeof file.name !== 'string' ||
+      file.name.length > 255 ||
+      typeof file.mimeType !== 'string' ||
+      !isImageUpload(file) ||
+      typeof file.data !== 'string' ||
+      file.data.length > Math.ceil(MAX_UPLOAD_FILE_BYTES / 3) * 4 ||
+      !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(file.data)
+    ) {
+      throw new Error('Invalid image attachment');
+    }
+    const padding = file.data.endsWith('==') ? 2 : file.data.endsWith('=') ? 1 : 0;
+    const size = (file.data.length / 4) * 3 - padding;
+    if (size <= 0 || size !== file.size) throw new Error('Invalid image size');
+    files.push({ name: file.name, mimeType: file.mimeType, data: file.data, size });
+  }
+  if (rejectionReason(files)) throw new Error('Image attachments exceed the upload limit');
+  return files;
+}
+
 export interface UploadsState {
   files: PendingUpload[];
 }
@@ -43,6 +78,7 @@ export const MAX_UPLOAD_TOTAL_BYTES = 6 * 1024 * 1024;
 export type UploadsStorage = BaseStorage<UploadsState> & {
   /** Replace the whole set, which is what the composer does on send. */
   setFiles: (files: PendingUpload[]) => Promise<void>;
+  appendFiles: (files: PendingUpload[]) => Promise<void>;
   /** Names only, for the line the prompt shows the agent. */
   listNames: () => Promise<string[]>;
   /**
@@ -73,7 +109,16 @@ export const uploadsStore: UploadsStorage = {
   ...storage,
 
   async setFiles(files: PendingUpload[]) {
+    if (rejectionReason(files)) throw new Error('Attachments exceed the upload limit');
     await storage.set({ files });
+  },
+
+  async appendFiles(files: PendingUpload[]) {
+    await storage.set(previous => {
+      const merged = [...previous.files.filter(old => !files.some(file => file.name === old.name)), ...files];
+      if (rejectionReason(merged)) throw new Error('Attachments exceed the upload limit');
+      return { files: merged };
+    });
   },
 
   async listNames() {

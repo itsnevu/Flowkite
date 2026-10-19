@@ -171,7 +171,7 @@
     "message": "Usar esta tarefa de novo"
   },
   "chat_history_continueNote": {
-    "message": "Enviar aqui continua esta conversa salva como uma nova tarefa; o agente começa do zero e não lembra da execução anterior"
+    "message": "Continue esta conversa usando o histórico salvo."
   },
   "chat_history_taskStillRunning": {
     "message": "Uma tarefa ainda está em execução no chat ao vivo. Volte a ele para enviar correções, ou pare-a antes de iniciar uma tarefa aqui."
@@ -2346,5 +2346,26 @@
   },
   "chat_feedback_report": {
     "message": "Conte o que deu errado"
+  },
+  "chat_attach_imagePrompt": {
+    "message": "Descreva as imagens anexadas."
+  },
+  "chat_attach_sendFailed": {
+    "message": "Não foi possível enviar os anexos. Seu rascunho foi mantido; tente novamente."
+  },
+  "chat_attach_reading": {
+    "message": "Lendo anexos…"
+  },
+  "chat_input_steerHint": {
+    "message": "Você pode enviar uma correção enquanto o agente trabalha."
+  },
+  "chat_attach_hint": {
+    "message": "Cole uma imagem, solte arquivos aqui ou use o botão de anexo."
+  },
+  "act_crawl_start": {
+    "message": "Lendo páginas vinculadas"
+  },
+  "act_crawl_result": {
+    "message": "Progresso: $1 páginas lidas, $2 linhas coletadas, $3 URLs pendentes, $4 páginas com falha."
   }
 }

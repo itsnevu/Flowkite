@@ -35,12 +35,13 @@ import {
 import { routeStep, ModelTier } from './routing';
 import type BrowserContext from '../browser/context';
 import type { AgentStepHistory } from './history';
-import type { ApprovalMode, GeneralSettingsConfig, ModelPricingConfig } from '@extension/storage';
+import type { ApprovalMode, PendingUpload, GeneralSettingsConfig, ModelPricingConfig } from '@extension/storage';
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
 
 const logger = createLogger('Executor');
 
 export interface ExecutorExtraArgs {
+  images?: PendingUpload[];
   plannerLLM?: BaseChatModel;
   fastLLM?: BaseChatModel;
   extractorLLM?: BaseChatModel;
@@ -108,7 +109,7 @@ export class Executor {
    * than the moment they arrive, because the alternative is mutating the message history underneath
    * a model call that is already in flight.
    */
-  private pendingSteers: string[] = [];
+  private pendingSteers: Array<{ text: string; images: PendingUpload[] }> = [];
   /**
    * Why the run was cancelled, when the canceller said. TASK_CANCEL's detail is the one line the
    * user keeps, and "Task cancelled" explains nothing when it was the closed tab that ended it.
@@ -210,8 +211,13 @@ export class Executor {
     });
 
     this.context = context;
+    context.beforeCrawlPage = async () => {
+      this.checkBudget();
+      await this.shouldStop();
+    };
     // Initialize message history
     this.context.messageManager.initTaskMessages(this.navigatorPrompt.getSystemMessage(), task);
+    this.context.messageManager.addTaskImages(extraArgs?.images ?? []);
   }
 
   /**
@@ -252,10 +258,10 @@ export class Executor {
    * and everything gathered so far stays. Nothing is applied here; the run picks it up at its next
    * step boundary.
    */
-  steer(text: string): void {
+  steer(text: string, images: PendingUpload[] = []): void {
     const trimmed = text.trim();
     if (!trimmed) return;
-    this.pendingSteers.push(trimmed);
+    this.pendingSteers.push({ text: trimmed, images });
     logger.info(`Steer queued: ${trimmed}`);
   }
 
@@ -269,15 +275,17 @@ export class Executor {
     const steers = this.pendingSteers;
     this.pendingSteers = [];
     for (const steer of steers) {
-      this.context.messageManager.addSteer(steer);
-      this.context.emitEvent(Actors.SYSTEM, ExecutionState.STEP_OK, t('exec_steer_applied', [steer]));
+      this.context.messageManager.addSteer(steer.text);
+      this.context.messageManager.addTaskImages(steer.images);
+      this.context.emitEvent(Actors.SYSTEM, ExecutionState.STEP_OK, t('exec_steer_applied', [steer.text]));
     }
     return true;
   }
 
-  addFollowUpTask(task: string): void {
+  addFollowUpTask(task: string, images: PendingUpload[] = []): void {
     this.tasks.push(task);
     this.context.messageManager.addNewTask(task);
+    this.context.messageManager.addTaskImages(images);
     // a follow-up is a new intent, so it needs its own approval, and it may be on a different site
     this.planApproved = false;
     this.memoriesInjected = false;
@@ -384,6 +392,12 @@ export class Executor {
           justPlanned = true;
           latestPlanOutput = await this.runPlanner();
 
+          if (this.pendingSteers.length > 0) {
+            latestPlanOutput = null;
+            navigatorDone = false;
+            continue;
+          }
+
           // Check if task is complete after planner run
           if (this.checkTaskCompletion(latestPlanOutput)) {
             break;
@@ -392,6 +406,10 @@ export class Executor {
           // Human-in-the-loop: show the plan and wait for approval before any action runs
           if (!(await this.ensurePlanApproved(latestPlanOutput))) {
             break;
+          }
+          if (this.pendingSteers.length > 0) {
+            latestPlanOutput = null;
+            continue;
           }
         }
 
@@ -545,16 +563,33 @@ export class Executor {
       const session = await chatHistoryStore.getSession(this.context.taskId);
       if (!session || !session.messages || session.messages.length === 0) return;
 
+      const crawl = await chatHistoryStore.loadCrawlCheckpoint(this.context.taskId);
+      if (crawl && (crawl.queue.length > 0 || crawl.failed.length > 0)) {
+        this.context.messageManager.addSessionHistory([
+          {
+            actor: 'agent',
+            content: `Saved crawl progress (reference data): ${JSON.stringify({
+              config: crawl.key,
+              completedPages: crawl.completed.length,
+              pendingPages: crawl.queue.length,
+              failedPages: crawl.failed.length,
+              rows: crawl.dataset.rows.length,
+            })}. Invoke crawl_pages with the same configuration to resume.`,
+          },
+        ]);
+      }
+
       const currentTaskStr = (this.tasks[this.tasks.length - 1] || '').trim();
-      const previousMessages = session.messages.filter(msg => {
-        if (!msg.content) return false;
+      // Only omit the pending prompt at the tail. Earlier identical prompts are real turns,
+      // and words such as "Replay" in an answer do not make it a replay command.
+      const messages = [...session.messages];
+      const latestMessage = messages[messages.length - 1];
+      if (latestMessage?.actor === Actors.USER && latestMessage.content.trim() === currentTaskStr) {
+        messages.pop();
+      }
+      const previousMessages = messages.filter(msg => {
         const content = msg.content.trim();
-        if (content.startsWith('/') || content.startsWith('Replay of') || content.includes('Replay')) {
-          return false;
-        }
-        if (content === currentTaskStr) {
-          return false;
-        }
+        if (!content || (msg.actor === Actors.USER && content.startsWith('/'))) return false;
         return (
           msg.actor === Actors.USER ||
           msg.actor === Actors.SYSTEM ||

@@ -110,6 +110,8 @@ export class AgentContext {
    * executor can hand the finished set to the panel without reaching into the action registry.
    */
   dataset: TaskDataset;
+  /** Budget/pause gate for each page in a multi-page read action. */
+  beforeCrawlPage?: () => Promise<void>;
   finalAnswer: string | null;
   /** Resolver for the pending sensitive-action gate, set only while the user is being asked. */
   private actionConfirmationResolver: ((approved: boolean) => void) | null = null;

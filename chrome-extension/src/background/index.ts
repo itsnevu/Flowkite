@@ -1,6 +1,7 @@
 import 'webextension-polyfill';
 import {
   Actors,
+  readTaskImages,
   agentModelStore,
   AgentNameEnum,
   chatHistoryStore,
@@ -31,7 +32,7 @@ import { injectBuildDomTreeScripts } from './browser/dom/service';
 import { analytics } from './services/analytics';
 import type { WebhookFollowUp } from './services/webhookContract';
 import type { TaskWebhookPayload } from './services/webhook';
-import type { ScheduledTask, ApprovalMode, MessageDataset } from '@extension/storage';
+import type { ScheduledTask, ApprovalMode, PendingUpload, MessageDataset } from '@extension/storage';
 import type { AgentEvent, DatasetPayload } from './agent/event/types';
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
 
@@ -51,16 +52,29 @@ const SIDE_PANEL_URL = chrome.runtime.getURL('side-panel/index.html');
  * busy" and proceeded to fight each other for the one shared BrowserContext.
  */
 let executorBusy = false;
+let initializingTaskId: string | null = null;
+let initializingSteers: Array<{ task: string; images: PendingUpload[] }> = [];
+
+function activatePanelExecutor(executor: Executor): void {
+  currentExecutor = executor;
+  for (const correction of initializingSteers) executor.steer(correction.task, correction.images);
+  initializingSteers = [];
+  initializingTaskId = null;
+}
 
 /** Claim the run slot now, synchronously. False means another run already holds it. */
-function claimRunSlot(): boolean {
+function claimRunSlot(taskId?: unknown): boolean {
   if (executorBusy) return false;
   executorBusy = true;
+  initializingTaskId = typeof taskId === 'string' ? taskId : null;
+  initializingSteers = [];
   return true;
 }
 
 function releaseRunSlot(): void {
   executorBusy = false;
+  initializingTaskId = null;
+  initializingSteers = [];
 }
 
 /**
@@ -296,7 +310,7 @@ chrome.runtime.onConnect.addListener(port => {
             if (!message.tabId) return port.postMessage({ type: 'error', error: t('bg_errors_noTabId') });
             // A scheduled or webhook run may hold the slot; a second executor over the same
             // BrowserContext would have two agents driving one browser.
-            if (!claimRunSlot()) return port.postMessage({ type: 'error', error: t('bg_cmd_task_busy') });
+            if (!claimRunSlot(message.taskId)) return port.postMessage({ type: 'error', error: t('bg_cmd_task_busy') });
 
             logger.info('new_task', message.tabId, message.task);
             try {
@@ -305,8 +319,10 @@ chrome.runtime.onConnect.addListener(port => {
                 message.task,
                 browserContext,
                 readApprovalMode(message.approvalMode),
+                false,
+                readTaskImages(message.images),
               );
-              currentExecutor = executor;
+              activatePanelExecutor(executor);
               // After setup, which can throw: a meta written before it would outlive the failed
               // run and stamp the next terminal event with this task's identity.
               currentTaskMeta = { source: 'manual', task: message.task, startedAt: Date.now(), chain: 0 };
@@ -323,25 +339,29 @@ chrome.runtime.onConnect.addListener(port => {
 
           case 'steer': {
             if (!message.task) return port.postMessage({ type: 'error', error: t('bg_cmd_newTask_noTask') });
-            // A correction with nothing to correct is a user talking to a run that already ended;
-            // saying so is better than silently dropping what they typed.
-            if (!currentExecutor || !executorBusy) {
+            const images = readTaskImages(message.images);
+            if (executorBusy && initializingTaskId && message.taskId === initializingTaskId) {
+              initializingSteers.push({ task: message.task, images });
+              break;
+            }
+            const executor = currentExecutor;
+            if (!executor || !executorBusy || (await executor.getCurrentTaskId()) !== message.taskId || !executorBusy) {
               return port.postMessage({ type: 'error', error: t('bg_cmd_steer_notRunning') });
             }
-            logger.info('steer', message.task);
-            currentExecutor.steer(message.task);
+            executor.steer(message.task, images);
             break;
           }
 
           case 'follow_up_task': {
             if (!message.task) return port.postMessage({ type: 'error', error: t('bg_cmd_followUpTask_noTask') });
             if (!message.tabId) return port.postMessage({ type: 'error', error: t('bg_errors_noTabId') });
-            if (!claimRunSlot()) return port.postMessage({ type: 'error', error: t('bg_cmd_task_busy') });
+            if (!claimRunSlot(message.taskId)) return port.postMessage({ type: 'error', error: t('bg_cmd_task_busy') });
 
             logger.info('follow_up_task', message.tabId, message.task);
             try {
-              if (currentExecutor) {
+              if (currentExecutor && (await currentExecutor.getCurrentTaskId()) === message.taskId) {
                 const executor = currentExecutor;
+                activatePanelExecutor(executor);
                 currentTaskMeta = { source: 'manual', task: message.task, startedAt: Date.now(), chain: 0 };
                 currentPanelTaskId = typeof message.taskId === 'string' ? message.taskId : null;
                 // The Executor is reused here rather than rebuilt, so it still carries the mode the
@@ -349,24 +369,24 @@ chrome.runtime.onConnect.addListener(port => {
                 // task and be silently ignored for every follow-up after it.
                 const followUpMode = readApprovalMode(message.approvalMode);
                 if (followUpMode) executor.setApprovalMode(followUpMode);
-                executor.addFollowUpTask(message.task);
+                executor.addFollowUpTask(message.task, readTaskImages(message.images));
                 // Re-subscribe to events in case the previous subscription was cleaned up
                 subscribeToExecutorEvents(executor);
                 const result = await executor.execute();
                 logger.info('follow_up_task execution result', message.tabId, result);
               } else {
-                // The executor is gone - the worker restarted, or the last run was unattended and
-                // released it. Its conversation context is unrecoverable either way, so run the
-                // prompt as a fresh task in the same session instead of bouncing the user's typed
-                // prompt back as an error they cannot act on.
-                logger.info('follow_up_task: no live executor; starting a fresh task in the same session');
+                // A restarted worker has no executor; switching chats may leave another session's
+                // executor here. Build one for the requested session and restore its saved history.
+                logger.info('follow_up_task: restoring the requested session with a fresh executor');
                 const executor = await setupExecutor(
                   message.taskId,
                   message.task,
                   browserContext,
                   readApprovalMode(message.approvalMode),
+                  false,
+                  readTaskImages(message.images),
                 );
-                currentExecutor = executor;
+                activatePanelExecutor(executor);
                 currentTaskMeta = { source: 'manual', task: message.task, startedAt: Date.now(), chain: 0 };
                 currentPanelTaskId = typeof message.taskId === 'string' ? message.taskId : null;
                 subscribeToExecutorEvents(executor);
@@ -602,6 +622,7 @@ async function setupExecutor(
   approvalModeOverride?: ApprovalMode,
   /** Scheduled runs: plan gate pre-approved, sensitive actions auto-declined. See AgentOptions.unattended. */
   unattended = false,
+  images: PendingUpload[] = [],
 ) {
   const providers = await llmProviderStore.getAllProviders();
   // if no providers, need to display the options page
@@ -689,6 +710,7 @@ async function setupExecutor(
   }
 
   const executor = new Executor(task, taskId, browserContext, navigatorLLM, {
+    images,
     plannerLLM: plannerLLM ?? navigatorLLM,
     fastLLM: fastLLM ?? undefined,
     providers: {

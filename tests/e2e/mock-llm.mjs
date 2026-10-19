@@ -40,19 +40,26 @@ const NAV = {
 export function startMockLLM(responses = {}) {
   const bySchema = { planner_output: PLAN, navigator_output: NAV, ...responses };
   const calls = [];
+  const requests = [];
 
   const server = http.createServer((req, res) => {
     let body = '';
     req.on('data', chunk => (body += chunk));
-    req.on('end', () => {
+    req.on('end', async () => {
       let schemaName = 'planner_output';
       try {
-        schemaName = JSON.parse(body).response_format?.json_schema?.name ?? schemaName;
+        const parsed = JSON.parse(body);
+        requests.push(parsed);
+        schemaName = parsed.response_format?.json_schema?.name ?? schemaName;
       } catch {
         // a request we cannot parse still gets a planner answer rather than an error
       }
       calls.push(schemaName);
 
+      const response =
+        typeof bySchema[schemaName] === 'function'
+          ? await bySchema[schemaName](requests.at(-1), calls.length)
+          : (bySchema[schemaName] ?? PLAN);
       res.writeHead(200, { 'content-type': 'application/json' });
       res.end(
         JSON.stringify({
@@ -63,7 +70,7 @@ export function startMockLLM(responses = {}) {
           choices: [
             {
               index: 0,
-              message: { role: 'assistant', content: JSON.stringify(bySchema[schemaName] ?? PLAN) },
+              message: { role: 'assistant', content: JSON.stringify(response) },
               finish_reason: 'stop',
             },
           ],
@@ -78,6 +85,7 @@ export function startMockLLM(responses = {}) {
       resolve({
         callCount: () => calls.length,
         calls: () => [...calls],
+        requests: () => [...requests],
         close: () => new Promise(done => server.close(done)),
       }),
     );

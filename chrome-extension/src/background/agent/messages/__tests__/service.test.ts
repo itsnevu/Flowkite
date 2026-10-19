@@ -471,3 +471,16 @@ describe('MessageManager.cutMessages past a free exchange', () => {
     expect(totalTokens(manager)).toBeLessThanOrEqual(settings.maxInputTokens);
   });
 });
+
+describe('user image attachments', () => {
+  it('passes image bytes as vision blocks rather than plain base64 text', () => {
+    const manager = new MessageManager();
+    manager.initTaskMessages(new SystemMessage('System'), 'Describe this');
+    manager.addTaskImages([{ name: 'photo.png', mimeType: 'image/png', data: 'iVBORw==', size: 4 }]);
+    const messages = manager.getMessages();
+    expect(messages.at(-1)?.content).toEqual([
+      expect.objectContaining({ type: 'text' }),
+      { type: 'image_url', image_url: { url: 'data:image/png;base64,iVBORw==' } },
+    ]);
+  });
+});
