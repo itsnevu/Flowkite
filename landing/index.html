@@ -105,7 +105,7 @@
             "name": "Is it free?",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "The extension is free to download: no paid tier, no trial, no account. What costs money is the model: you bring your own API key and your provider bills you directly. Run a local model through Ollama and even that goes to zero."
+              "text": "Yes. No paid tier and no account. You only pay your AI provider for what you use, and nothing at all with a local model through Ollama."
             }
           },
           {
@@ -113,23 +113,7 @@
             "name": "Where do my API keys go?",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "Into chrome.storage.local on your own machine, and nowhere else. Requests go straight from your browser to the provider you configured. Flowkite has no backend to proxy them through. Uninstall the extension and they are gone with it."
-            }
-          },
-          {
-            "@type": "Question",
-            "name": "Does it work with local models?",
-            "acceptedAnswer": {
-              "@type": "Answer",
-              "text": "Yes, Ollama is supported directly, and any OpenAI-compatible endpoint works if you give it a base URL. That setup has zero API cost and nothing leaves your machine. Local models want more specific prompts: break the task into explicit steps."
-            }
-          },
-          {
-            "@type": "Question",
-            "name": "Is it on the Chrome Web Store?",
-            "acceptedAnswer": {
-              "@type": "Answer",
-              "text": "Yes. One click from the Chrome Web Store, and Chrome keeps it updated for you. If you would rather not go through the store, the zip on this site installs with Load unpacked; upgrading that copy means replacing the folder and pressing refresh on the Flowkite card in chrome://extensions."
+              "text": "They stay in your browser and go straight to your AI provider. There is no Flowkite server."
             }
           },
           {
@@ -137,7 +121,15 @@
             "name": "What data leaves my machine?",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "Page structure, and, only if you switch vision on, screenshots, sent to the LLM provider you chose using your key. Builds that ship with an analytics key also send anonymous usage events to PostHog, which Options → Analytics switches off; a copy you built yourself carries no key. Settings, task history, API keys and memories stay in chrome.storage.local."
+              "text": "Only what a task needs: the page it is working on, the titles of your open tabs, and screenshots when vision is on, sent to the AI provider you chose. The privacy policy has the details."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Does it work with local models?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Yes, through Ollama or any OpenAI-compatible endpoint."
             }
           },
           {
@@ -145,7 +137,7 @@
             "name": "Which browsers are supported?",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "Chrome and Edge are fully supported. Firefox and Safari are not. Flowkite is a Manifest V3 extension built on Chrome's own APIs. Other Chromium browsers such as Brave, Arc and Opera may well work, but they are not tested."
+              "text": "Chrome and Edge."
             }
           }
         ]
@@ -168,9 +160,7 @@
         <nav class="nav__links" aria-label="Primary">
           <a class="nav__link" href="#demo">Demo</a>
           <a class="nav__link" href="#features">Features</a>
-          <a class="nav__link" href="#how">How it works</a>
-          <a class="nav__link" href="#providers">Providers</a>
-          <a class="nav__link" href="#quickstart">Quickstart</a>
+          <a class="nav__link" href="#quickstart">Install</a>
           <a class="nav__link" href="#faq">FAQ</a>
           <span class="nav__langs" role="group" aria-label="Language">
             <a class="nav__lang" href="/" lang="en" aria-current="page">EN</a>
@@ -196,9 +186,7 @@
           <div class="nav__sheet-card">
             <a class="nav__sheet-link" href="#demo">Demo</a>
             <a class="nav__sheet-link" href="#features">Features</a>
-            <a class="nav__sheet-link" href="#how">How it works</a>
-            <a class="nav__sheet-link" href="#providers">Providers</a>
-            <a class="nav__sheet-link" href="#quickstart">Quickstart</a>
+            <a class="nav__sheet-link" href="#quickstart">Install</a>
             <a class="nav__sheet-link" href="#faq">FAQ</a>
             <span class="nav__sheet-langs" role="group" aria-label="Language">
               <a class="nav__sheet-lang" href="/" lang="en" aria-current="page">EN</a>
@@ -217,16 +205,11 @@
         <div class="hero__veil" aria-hidden="true"></div>
 
         <div class="container hero__inner">
-          <p class="eyebrow reveal">Free AI web automation · multi-agent · local-first</p>
+          <p class="eyebrow reveal">Free AI browser agent</p>
 
           <h1 id="hero-title" class="hero__title reveal">A browser agent that <em>asks first</em>.</h1>
 
-          <p class="hero__lede reveal">
-            Type a task in plain language and Flowkite carries it out in your own browser. A Planner works out the
-            approach, a Navigator clicks and types, and you watch the whole thing happen in the side panel. It shows you
-            its plan before it touches a page, stops to ask before anything irreversible, and sends your data straight
-            to the model provider you chose with the key you own. There is no Flowkite server in the middle.
-          </p>
+          <p class="hero__lede reveal">Tell it what you need. Flowkite does it in your browser and asks before anything important.</p>
 
           <!--
             A concrete taste of what you can ask for. main.ts types these out in rotation;
@@ -252,13 +235,10 @@
               </svg>
               Add to Chrome
             </a>
-            <a class="key key--ghost" href="#quickstart">Or install it yourself</a>
+            <a class="key key--ghost" href="/flowkite.zip" download>Download the zip</a>
           </div>
 
-          <p class="hero__note reveal">
-            Free to download, and it stays free. Rather not go through the store? Grab the
-            <a href="/flowkite.zip" download>zip</a> and load it yourself in <code>chrome://extensions</code>.
-          </p>
+          <p class="hero__note reveal">Free, no account. It runs on your own AI key.</p>
         </div>
       </section>
 
@@ -268,10 +248,6 @@
           <div class="section__head">
             <p class="eyebrow reveal">See it work</p>
             <h2 id="demo-title" class="reveal">This is what asking first looks like.</h2>
-            <p class="lede reveal">
-              One task, replayed in the side panel. The Planner proposes and waits, read-only tabs do the research, and
-              the one step that spends money stops for a yes before it happens.
-            </p>
           </div>
 
           <div class="demo reveal">
@@ -426,13 +402,8 @@
       <section id="features" class="section" aria-labelledby="features-title">
         <div class="container">
           <div class="section__head">
-            <p class="eyebrow reveal">What it actually does</p>
-            <h2 id="features-title" class="reveal">The interesting part of an agent is where it stops.</h2>
-            <p class="lede reveal">
-              Most browser agents ask for your logged-in session and then act. Flowkite is built the other way round:
-              every one of these is a place it hands control back to you, or refuses to spend something you did not
-              agree to.
-            </p>
+            <p class="eyebrow reveal">Features</p>
+            <h2 id="features-title" class="reveal">Does the work, leaves you in charge.</h2>
           </div>
 
           <ul class="grid grid--3" role="list">
@@ -443,93 +414,47 @@
                   <path d="m16 17 2.2 2.2L23 14" stroke-linecap="round" stroke-linejoin="round" />
                 </svg>
               </span>
-              <h3>Plan preview, then undo</h3>
-              <p>
-                Before it touches a page the agent writes out its plan and waits. Approve it and it runs; reject it and
-                nothing happened.
-              </p>
-              <p>
-                Undo rolls back the last step: the page navigates back <em>and</em> the agent forgets the step, so it
-                re-plans from the restored state instead of building on something you turned down.
-              </p>
+              <h3>Plan first</h3>
+              <p>It shows you the plan and waits for your OK.</p>
             </li>
-
             <li class="plate reveal">
               <span class="glyph" aria-hidden="true">
                 <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7">
-                  <path
-                    d="M12 3 4.5 6v5.6c0 4.3 3 8.2 7.5 9.4 4.5-1.2 7.5-5.1 7.5-9.4V6L12 3Z"
-                    stroke-linejoin="round" />
+                  <path d="M12 3 4.5 6v5.6c0 4.3 3 8.2 7.5 9.4 4.5-1.2 7.5-5.1 7.5-9.4V6L12 3Z" stroke-linejoin="round" />
                   <path d="M12 9v3.5M12 16h.01" stroke-linecap="round" />
                 </svg>
               </span>
-              <h3>Sensitive actions need a yes</h3>
-              <p>
-                Buying, deleting, submitting a form, downloading a file or typing into a password field all stop and ask
-                you first.
-              </p>
-              <p>
-                The check reads the <em>actual DOM element the agent picked</em>, its label, its type, its aria-label, not the model's description of what it thinks it is doing.
-              </p>
+              <h3>Asks before it spends</h3>
+              <p>Buying, deleting or typing a password always needs your yes.</p>
             </li>
-
             <li class="plate reveal">
               <span class="glyph" aria-hidden="true">
                 <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7">
-                  <rect x="4" y="4" width="16" height="16" rx="3.5" />
-                  <path d="M9 9h6v6H9z" stroke-linejoin="round" />
-                  <path d="M9 2v2M15 2v2M9 20v2M15 20v2M2 9h2M2 15h2M20 9h2M20 15h2" stroke-linecap="round" />
+                  <path d="M5 3.5 19 11l-6.2 1.7L10 19 5 3.5Z" stroke-linejoin="round" />
                 </svg>
               </span>
-              <h3>Memory that stays on your device</h3>
-              <p>
-                Tell it a preference once and it carries across sessions. Memories live in
-                <code>chrome.storage.local</code>, never uploaded to us, never synced. When memory is on, the ones matching the site go into the prompt sent to your own LLM provider.
-              </p>
-              <p>
-                Settings lists every stored fact with a delete button beside it, and one switch that turns the whole
-                thing off.
-              </p>
+              <h3>Watch it work</h3>
+              <p>A pointer labelled Flowkite shows each click, and every page change is announced.</p>
             </li>
-
             <li class="plate reveal">
               <span class="glyph" aria-hidden="true">
                 <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7">
-                  <rect x="2.5" y="6" width="12" height="12" rx="2.5" />
-                  <path d="M7 3.5h11A3.5 3.5 0 0 1 21.5 7v10" stroke-linecap="round" />
-                  <path d="M6 11h5M6 14h3" stroke-linecap="round" />
+                  <path d="M13 2.5 4.5 13.5H11l-1 8 8.5-11H12l1-8Z" stroke-linejoin="round" />
                 </svg>
               </span>
-              <h3>Research in parallel tabs</h3>
-              <p>
-                Independent lookups, the same product across three shops, run at the same time, each in its own
-                background tab, then merge into one answer.
-              </p>
-              <p>
-                Those tabs are read-only <em>by construction</em>: the action set they are handed contains no click, no
-                type, no submit. The one place you could not intervene is the one place nothing can act.
-              </p>
+              <h3>Skills</h3>
+              <p>Ready-made playbooks for research, shopping, forms and more. Type / to pick one.</p>
             </li>
-
             <li class="plate reveal">
               <span class="glyph" aria-hidden="true">
                 <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7">
-                  <path d="M3 7h4l3.5 10H14" stroke-linecap="round" stroke-linejoin="round" />
-                  <path d="M3 17h4L10.5 7H14" stroke-linecap="round" stroke-linejoin="round" />
-                  <path d="M17 4.5 21 7l-4 2.5M17 14.5 21 17l-4 2.5" stroke-linecap="round" stroke-linejoin="round" />
+                  <rect x="3" y="5" width="18" height="15" rx="2.5" />
+                  <path d="M3 9.5h18M8.5 5v4.5" stroke-linecap="round" />
                 </svg>
               </span>
-              <h3>Hybrid routing, fewer tokens</h3>
-              <p>
-                Assign an optional cheap model and routine navigation steps go to it, while your good model handles the
-                thinking.
-              </p>
-              <p>
-                Anything that is not routine escalates: a failure to recover from, a dense page, a step reasoning over a
-                screenshot, the first step of a new plan.
-              </p>
+              <h3>One tab, one Flowkite</h3>
+              <p>Each tab gets its own panel, and the agent stays in that tab.</p>
             </li>
-
             <li class="plate reveal">
               <span class="glyph" aria-hidden="true">
                 <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7">
@@ -538,134 +463,19 @@
                   <path d="M12 14v2.5" stroke-linecap="round" />
                 </svg>
               </span>
-              <h3>Guardrails on untrusted text</h3>
-              <p>
-                Page content is wrapped in explicit delimiters and scanned before it reaches the model, so text sitting
-                on a page cannot pose as an instruction to the agent.
-              </p>
-              <p>
-                Known prompt-injection and task-override patterns are stripped, and sensitive strings are caught on the
-                way out.
-              </p>
-            </li>
-          
-            <li class="plate reveal">
-              <span class="glyph" aria-hidden="true">
-                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7">
-                  <path d="M4 12h11" stroke-linecap="round" />
-                  <path d="m11 8 4 4-4 4" stroke-linecap="round" stroke-linejoin="round" />
-                  <path d="M19 4v16" stroke-linecap="round" />
-                </svg>
-              </span>
-              <h3>Correct it without stopping it</h3>
-              <p>
-                Watching it take the wrong turn on step three used to leave you one button: stop, and lose everything it
-                had worked out. Now you just type.
-              </p>
-              <p>
-                A correction keeps the plan's progress and overrides its direction. It lands at the next step boundary,
-                never underneath a model call already in flight, and the plan is rewritten so the old route cannot argue
-                with your new one.
-              </p>
-            </li>
-
-            <li class="plate reveal">
-              <span class="glyph" aria-hidden="true">
-                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7">
-                  <path d="M17.5 9.5 10 17a3.5 3.5 0 0 1-5-5l8-8a2.5 2.5 0 0 1 3.5 3.5l-8 8" stroke-linecap="round" stroke-linejoin="round" />
-                </svg>
-              </span>
-              <h3>Hand it a file to upload</h3>
-              <p>
-                Attach a CV, an invoice, a photo, and the agent can put it into a page's upload field, including the
-                styled buttons that hide the real input somewhere else in the markup.
-              </p>
-              <p>
-                The bytes stay in session storage, gone when Chrome closes, and never enter the prompt. Every upload
-                asks you first: the file leaves your machine the moment it runs.
-              </p>
-            </li>
-
-            <li class="plate reveal">
-              <span class="glyph" aria-hidden="true">
-                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7">
-                  <path d="M12 6v6l3.5 2" stroke-linecap="round" stroke-linejoin="round" />
-                  <circle cx="12" cy="12" r="8.5" />
-                </svg>
-              </span>
-              <h3>Watch a page, hear nothing until it moves</h3>
-              <p>
-                A daily task can run on a schedule with nobody watching. Turn on watch and it compares what it collected
-                with the run before, and only notifies you when something actually changed.
-              </p>
-              <p>
-                A price that moved reads as one changed row, not a deletion and an insertion. Prose answers are never
-                compared, because a model rewords the same fact every morning and that would notify you every morning.
-              </p>
+              <h3>Your keys stay yours</h3>
+              <p>No server, no account. Your keys and data stay in your browser.</p>
             </li>
           </ul>
         </div>
       </section>
 
-      <!-- ────────────────────────── how it works ───────────────────────── -->
-      <section id="how" class="section section--sunk" aria-labelledby="how-title">
-        <div class="container">
-          <div class="section__head">
-            <p class="eyebrow reveal">How it works</p>
-            <h2 id="how-title" class="reveal">Two agents, one browser, no server.</h2>
-            <p class="lede reveal">
-              Flowkite splits the job into two roles: one decides what to do, the other does it. All of it runs inside
-              the extension's service worker on your machine. The only thing that goes out is the request to the model
-              provider you configured.
-            </p>
-          </div>
-
-          <ol class="grid grid--3" role="list">
-            <li class="plate step reveal">
-              <span class="step__num" aria-hidden="true">1</span>
-              <h3>Planner</h3>
-              <p>
-                Reads your task and works out the approach: which sites, in what order, what "done" will look like. It
-                re-plans when the page turns out not to be what anyone expected.
-              </p>
-              <p class="step__meta">Decides when the task is finished. Required.</p>
-            </li>
-
-            <li class="plate step reveal">
-              <span class="step__num" aria-hidden="true">2</span>
-              <h3>Navigator</h3>
-              <p>
-                Does the actual work in the page: reads the DOM, clicks, types, scrolls, navigates. Cross-origin iframes
-                are read too, so embedded checkout and login widgets are not invisible to it.
-              </p>
-              <p class="step__meta">
-                If a page re-renders mid-step, the action is retried against fresh state. Routine steps can be handed to
-                a cheaper model you nominate; anything harder stays with your good one.
-              </p>
-            </li>
-          </ol>
-
-          <div class="well well--wide reveal">
-            <p>
-              <strong>The plan gate sits in front of both.</strong> The first plan of every task is shown to you and
-              waits for approval, and only the first, so re-planning mid-task does not nag you. Once things are moving,
-              undo is the escape hatch: it takes the page back and deletes the step from the agent's history, so the
-              next plan is built on the state you kept, not the one you rejected.
-            </p>
-          </div>
-        </div>
-      </section>
-
       <!-- ─────────────────────────── providers ─────────────────────────── -->
-      <section id="providers" class="section" aria-labelledby="providers-title">
+      <section id="providers" class="section section--sunk" aria-labelledby="providers-title">
         <div class="container">
           <div class="section__head">
             <p class="eyebrow reveal">Bring your own model</p>
-            <h2 id="providers-title" class="reveal">Eleven providers, plus anything OpenAI-compatible.</h2>
-            <p class="lede reveal">
-              Assign a model to each role, Planner, Navigator, and optionally a cheap Fast model for routine steps. Mix
-              vendors freely; nothing assumes they came from the same place.
-            </p>
+            <h2 id="providers-title" class="reveal">Works with the AI you already use.</h2>
           </div>
 
           <ul class="chips reveal" role="list">
@@ -682,101 +492,67 @@
             <li class="chip">Ollama <span class="chip__tag">local</span></li>
             <li class="chip">Any OpenAI-compatible endpoint</li>
           </ul>
-
-          <div class="well well--wide reveal">
-            <p>
-              Keys are stored locally in <code>chrome.storage.local</code> and go straight from your browser to the
-              provider you picked. They are never proxied through a Flowkite server, because there isn't one, no
-              backend, no account, nothing to sign up for. If your endpoint speaks the OpenAI API, point Flowkite at its
-              base URL and it works, including a model running on your own machine through Ollama.
-            </p>
-          </div>
         </div>
       </section>
 
       <!-- ─────────────────────────── quickstart ────────────────────────── -->
-      <section id="quickstart" class="section section--sunk" aria-labelledby="quickstart-title">
+      <section id="quickstart" class="section" aria-labelledby="quickstart-title">
         <div class="container">
           <div class="section__head">
-            <p class="eyebrow reveal">Quickstart</p>
-            <h2 id="quickstart-title" class="reveal">Add it to Chrome, then add a key.</h2>
-            <p class="lede reveal">
-              About two minutes. Almost everyone should take the first path; the second exists for people who would
-              rather hold the files themselves, and installs exactly the same build.
-            </p>
+            <p class="eyebrow reveal">Install</p>
+            <h2 id="quickstart-title" class="reveal">Ready in two minutes.</h2>
           </div>
 
-          <ol class="install" role="list">
+          <ol class="install grid grid--3" role="list">
             <li class="well reveal">
-              <h3><span class="install__num" aria-hidden="true">1</span> Add it to Chrome</h3>
-              <p>
-                One click from the Chrome Web Store, and Chrome keeps it up to date on its own. Flowkite appears in the
-                toolbar when it finishes.
-              </p>
+              <h3><span class="install__num" aria-hidden="true">1</span> Add to Chrome</h3>
+              <p>One click from the Chrome Web Store.</p>
               <p class="cta cta--inline">
                 <a class="key" href="https://chromewebstore.google.com/detail/flowkite-ai-web-agent-aut/kacmblccfhnfcjfpeageldmmbkocafab" rel="noopener noreferrer">Add to Chrome</a>
               </p>
             </li>
-
             <li class="well reveal">
-              <h3><span class="install__num" aria-hidden="true">2</span> Add an API key and assign models</h3>
-              <p>
-                Open the side panel, click the settings icon, paste a key from any supported provider, then give the
-                Planner and Navigator a model each. Add a cheap Fast model if you want routine steps routed away from
-                your expensive one.
-              </p>
-              <p class="note">
-                Plan approval and sensitive-action confirmation are both on by default. Leave them that way until you
-                trust it.
-              </p>
+              <h3><span class="install__num" aria-hidden="true">2</span> Add your AI key</h3>
+              <p>Open Settings in the side panel and paste a key.</p>
+            </li>
+            <li class="well reveal">
+              <h3><span class="install__num" aria-hidden="true">3</span> Ask</h3>
+              <p>Type what you need and approve the plan.</p>
             </li>
           </ol>
 
-          <div class="well reveal" id="manual-install">
-            <h3>Rather install it by hand?</h3>
-            <p>
-              Download the build and load it yourself. Same files the store ships. The trade is that Chrome will not
-              update it for you: when a new version lands, download it again and replace the folder.
-            </p>
-            <ol class="install install--compact" role="list">
+          <details class="faq__item reveal" id="manual-install">
+            <summary>
+              <span>Install from the zip instead</span>
+              <span class="faq__icon" aria-hidden="true"></span>
+            </summary>
+            <div class="faq__body">
+              <ol class="install install--compact" role="list">
               <li>
-                <p>
-                  Download <a href="/flowkite.zip" download><strong>flowkite.zip</strong></a> and unzip it. Keep the
-                  folder somewhere you will not delete by accident, because Chrome loads it from where it sits.
-                </p>
+                <p>Download <a href="/flowkite.zip" download><strong>flowkite.zip</strong></a> and unzip it.</p>
               </li>
               <li>
-                <p>Paste this into the address bar. It is not a link a web page is allowed to open for you.</p>
+                <p>Open this address:</p>
                 <pre class="code"><code>chrome://extensions/</code></pre>
               </li>
               <li>
-                <p>
-                  Turn on <strong>Developer mode</strong> with the toggle in the top-right corner. Without it, Chrome
-                  will not offer the Load unpacked button.
-                </p>
+                <p>Turn on <strong>Developer mode</strong> (top right).</p>
               </li>
               <li>
-                <p>
-                  Click <strong>Load unpacked</strong> and pick the unzipped folder itself, not a file inside it. Then
-                  carry on from step 2 above.
-                </p>
+                <p>Click <strong>Load unpacked</strong> and pick the unzipped folder.</p>
               </li>
-            </ol>
-          </div>
-
-          <div class="cta reveal">
-            <a class="key" href="https://chromewebstore.google.com/detail/flowkite-ai-web-agent-aut/kacmblccfhnfcjfpeageldmmbkocafab" rel="noopener noreferrer">Add to Chrome</a>
-            <a class="key key--ghost" href="/flowkite.zip" download>Download the zip</a>
-          </div>
+              </ol>
+            </div>
+          </details>
         </div>
       </section>
 
       <!-- ────────────────────────────── faq ────────────────────────────── -->
-      <section id="faq" class="section" aria-labelledby="faq-title">
+      <section id="faq" class="section section--sunk" aria-labelledby="faq-title">
         <div class="container container--narrow">
           <div class="section__head">
-            <p class="eyebrow reveal">Straight answers</p>
-            <h2 id="faq-title" class="reveal">Frequently asked, honestly answered.</h2>
+            <p class="eyebrow reveal">FAQ</p>
+            <h2 id="faq-title" class="reveal">Quick answers.</h2>
           </div>
 
           <div class="faq">
@@ -786,90 +562,43 @@
                 <span class="faq__icon" aria-hidden="true"></span>
               </summary>
               <div class="faq__body">
-                <p>
-                  The extension is free to download. There is no paid tier, no trial and no account. What costs
-                  money is the model: you bring your own API key and your provider bills you directly for what the agent
-                  uses. Run a local model through Ollama and even that goes to zero.
-                </p>
+                <p>Yes. No paid tier and no account. You only pay your AI provider for what you use, and nothing at all with a local model through Ollama.</p>
               </div>
             </details>
-
             <details class="faq__item reveal" id="faq-keys">
               <summary>
                 <span>Where do my API keys go?</span>
                 <span class="faq__icon" aria-hidden="true"></span>
               </summary>
               <div class="faq__body">
-                <p>
-                  Into <code>chrome.storage.local</code> on your own machine, and nowhere else. Requests go straight
-                  from your browser to the provider you configured. Flowkite has no backend to proxy them through, so
-                  there is no server of ours that could ever see a key. Uninstall the extension and they are gone with
-                  it.
-                </p>
+                <p>They stay in your browser and go straight to your AI provider. There is no Flowkite server.</p>
               </div>
             </details>
-
-            <details class="faq__item reveal" id="faq-local-models">
-              <summary>
-                <span>Does it work with local models?</span>
-                <span class="faq__icon" aria-hidden="true"></span>
-              </summary>
-              <div class="faq__body">
-                <p>
-                  Yes, Ollama is supported directly, and any OpenAI-compatible endpoint works if you give it a base
-                  URL. That setup has zero API cost and nothing leaves your machine at all. One caveat: local models
-                  want more specific prompts. Break the task into explicit steps rather than handing over one
-                  high-level, ambiguous instruction.
-                </p>
-              </div>
-            </details>
-
-            <details class="faq__item reveal" id="faq-web-store">
-              <summary>
-                <span>Is it on the Chrome Web Store?</span>
-                <span class="faq__icon" aria-hidden="true"></span>
-              </summary>
-              <div class="faq__body">
-                <p>
-                  Yes — one click from the
-                  <a href="https://chromewebstore.google.com/detail/flowkite-ai-web-agent-aut/kacmblccfhnfcjfpeageldmmbkocafab" rel="noopener noreferrer">Chrome Web Store</a>, and Chrome keeps it
-                  updated for you. If you would rather not go through the store, the zip on this page installs with
-                  <strong>Load unpacked</strong> — upgrading that copy means replacing the folder and pressing refresh
-                  on the Flowkite card in <code>chrome://extensions</code>. See the
-                  <a href="#quickstart">Quickstart</a> for the full sequence.
-                </p>
-              </div>
-            </details>
-
             <details class="faq__item reveal" id="faq-data">
               <summary>
                 <span>What data leaves my machine?</span>
                 <span class="faq__icon" aria-hidden="true"></span>
               </summary>
               <div class="faq__body">
-                <p>
-                  Page structure, and, only if you switch vision on, screenshots, sent to the LLM provider you chose
-                  using your key; once data reaches them their policy governs it, so pick one you are comfortable with.
-                  Builds that ship with an analytics key also send anonymous usage events to PostHog, a task started,
-                  completed, failed or cancelled, plus the bare hostname of each domain the agent visits, which
-                  <strong>Options → Analytics</strong> switches off, and a copy you built yourself carries no key, so it
-                  never runs at all. Your settings, task history, API keys and memories stay in
-                  <code>chrome.storage.local</code> and are never uploaded to us.
-                </p>
+                <p>Only what a task needs: the page it is working on, the titles of your open tabs, and screenshots when vision is on, sent to the AI provider you chose. The <a href="/privacy-policy/">privacy policy</a> has the details.</p>
               </div>
             </details>
-
+            <details class="faq__item reveal" id="faq-local-models">
+              <summary>
+                <span>Does it work with local models?</span>
+                <span class="faq__icon" aria-hidden="true"></span>
+              </summary>
+              <div class="faq__body">
+                <p>Yes, through Ollama or any OpenAI-compatible endpoint.</p>
+              </div>
+            </details>
             <details class="faq__item reveal" id="faq-browsers">
               <summary>
                 <span>Which browsers are supported?</span>
                 <span class="faq__icon" aria-hidden="true"></span>
               </summary>
               <div class="faq__body">
-                <p>
-                  Chrome and Edge are fully supported. Firefox and Safari are not. Flowkite is a Manifest V3 extension
-                  built on Chrome's own APIs. Other Chromium browsers such as Brave, Arc and Opera may well work, but
-                  they are not tested.
-                </p>
+                <p>Chrome and Edge.</p>
               </div>
             </details>
           </div>
@@ -885,10 +614,7 @@
             <img src="/mark.png" alt="" width="32" height="32" decoding="async" />
             <div>
               <p class="footer__name">Flowkite</p>
-              <p class="footer__meta">
-                Free to download, under the Apache&nbsp;2.0 licence. Human-in-the-loop control, running on your own API
-                keys.
-              </p>
+              <p class="footer__meta">Free and open source under the Apache&nbsp;2.0 licence.</p>
             </div>
           </div>
 
@@ -905,10 +631,7 @@
           </nav>
         </div>
 
-        <p class="footer__fine">
-          Runs locally in your browser. No accounts, no backend, and any usage analytics can be switched off. Not
-          affiliated with any model provider.
-        </p>
+        <p class="footer__fine">Runs in your browser. No account, no server. Not affiliated with any AI provider.</p>
       </div>
     </footer>
 

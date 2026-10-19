@@ -70,18 +70,26 @@
         "mainEntity": [
           {
             "@type": "Question",
-            "name": "É gratuito?",
+            "name": "É grátis?",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "A extensão é gratuita para baixar, sem plano pago, sem trial, sem conta. O que custa dinheiro é o modelo: você traz sua própria chave de API e o provedor cobra diretamente de você. Rodando um modelo local via Ollama, até isso cai para zero."
+              "text": "Sim. Sem plano pago e sem conta. Você só paga ao seu provedor de IA pelo que usar, e nada com um modelo local via Ollama."
             }
           },
           {
             "@type": "Question",
-            "name": "Para onde vão minhas chaves de API?",
+            "name": "Para onde vão as minhas chaves de API?",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "Para o chrome.storage.local na sua própria máquina, e para nenhum outro lugar. As requisições vão direto do seu navegador ao provedor configurado. A Flowkite não tem backend para intermediá-las. Desinstale a extensão e elas somem junto."
+              "text": "Elas ficam no seu navegador e vão direto para o seu provedor de IA. Não existe servidor do Flowkite."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Quais dados saem da minha máquina?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Só o que a tarefa precisa: a página em que ele está trabalhando, os títulos das suas abas abertas e capturas de tela quando a visão está ligada, enviados ao provedor de IA que você escolheu. A política de privacidade tem os detalhes."
             }
           },
           {
@@ -89,23 +97,7 @@
             "name": "Funciona com modelos locais?",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "Sim, o Ollama é suportado diretamente, e qualquer endpoint compatível com a API da OpenAI funciona informando a URL base. Nessa configuração o custo de API é zero e nada sai da sua máquina. Modelos locais pedem prompts mais específicos: divida a tarefa em passos explícitos."
-            }
-          },
-          {
-            "@type": "Question",
-            "name": "Está na Chrome Web Store?",
-            "acceptedAnswer": {
-              "@type": "Answer",
-              "text": "Sim. Um clique na Chrome Web Store, e o Chrome mantém a extensão atualizada para você. Se preferir não passar pela loja, o zip deste site instala com Carregar sem compactação; para atualizar essa cópia, substitua a pasta e aperte atualizar no cartão da Flowkite em chrome://extensions."
-            }
-          },
-          {
-            "@type": "Question",
-            "name": "Que dados saem da minha máquina?",
-            "acceptedAnswer": {
-              "@type": "Answer",
-              "text": "A estrutura da página e, apenas se você ativar visão, capturas de tela, enviadas ao provedor de LLM que você escolheu com a sua chave. Builds que incluem chave de analytics também enviam eventos anônimos de uso ao PostHog, que Opções → Analytics desliga; uma cópia compilada por você não carrega chave nenhuma. Configurações, histórico, chaves de API e memórias ficam no chrome.storage.local."
+              "text": "Sim, via Ollama ou qualquer endpoint compatível com a OpenAI."
             }
           },
           {
@@ -113,7 +105,7 @@
             "name": "Quais navegadores são suportados?",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "Chrome e Edge são totalmente suportados. Firefox e Safari não, a Flowkite é uma extensão Manifest V3 construída sobre as APIs do próprio Chrome. Outros navegadores Chromium como Brave, Arc e Opera podem funcionar, mas não são testados."
+              "text": "Chrome e Edge."
             }
           }
         ]
@@ -136,9 +128,7 @@
         <nav class="nav__links" aria-label="Principal">
           <a class="nav__link" href="#demo">Demo</a>
           <a class="nav__link" href="#features">Recursos</a>
-          <a class="nav__link" href="#how">Como funciona</a>
-          <a class="nav__link" href="#providers">Provedores</a>
-          <a class="nav__link" href="#quickstart">Comece rápido</a>
+          <a class="nav__link" href="#quickstart">Instalar</a>
           <a class="nav__link" href="#faq">FAQ</a>
           <span class="nav__langs" role="group" aria-label="Idioma">
             <a class="nav__lang" href="/" lang="en">EN</a>
@@ -158,9 +148,7 @@
           <div class="nav__sheet-card">
             <a class="nav__sheet-link" href="#demo">Demo</a>
             <a class="nav__sheet-link" href="#features">Recursos</a>
-            <a class="nav__sheet-link" href="#how">Como funciona</a>
-            <a class="nav__sheet-link" href="#providers">Provedores</a>
-            <a class="nav__sheet-link" href="#quickstart">Comece rápido</a>
+            <a class="nav__sheet-link" href="#quickstart">Instalar</a>
             <a class="nav__sheet-link" href="#faq">FAQ</a>
             <span class="nav__sheet-langs" role="group" aria-label="Idioma">
               <a class="nav__sheet-lang" href="/" lang="en">EN</a>
@@ -179,17 +167,11 @@
         <div class="hero__veil" aria-hidden="true"></div>
 
         <div class="container hero__inner">
-          <p class="eyebrow reveal">Automação web com IA, grátis · multiagente · local-first</p>
+          <p class="eyebrow reveal">Agente de navegador com IA, grátis</p>
 
           <h1 id="hero-title" class="hero__title reveal">Um agente de navegador que <em>pergunta antes</em>.</h1>
 
-          <p class="hero__lede reveal">
-            Descreva uma tarefa em linguagem natural e a Flowkite a executa no seu próprio navegador, um Planner define
-            a abordagem, um Navigator clica e digita, e você acompanha tudo pelo painel lateral. Ela mostra o plano
-            antes de tocar em qualquer página, para e pergunta antes de qualquer coisa irreversível, e envia seus dados
-            direto ao provedor de modelo que você escolheu, com a chave que é sua. Não existe servidor da Flowkite no
-            meio do caminho.
-          </p>
+          <p class="hero__lede reveal">Diga o que você precisa. O Flowkite faz no seu navegador e pergunta antes de qualquer coisa importante.</p>
 
           <p class="hero__try reveal">
             <span class="hero__try-label">Experimente pedir:</span>
@@ -210,13 +192,10 @@
               </svg>
               Instalar no Chrome
             </a>
-            <a class="key key--ghost" href="#quickstart">Ou instale você mesmo</a>
+            <a class="key key--ghost" href="/flowkite.zip" download>Baixar o zip</a>
           </div>
 
-          <p class="hero__note reveal">
-            Grátis para baixar, e continua grátis. Prefere não passar pela loja? Baixe o
-            <a href="/flowkite.zip" download>zip</a> e carregue você mesmo em <code>chrome://extensions</code>.
-          </p>
+          <p class="hero__note reveal">Grátis, sem conta. Funciona com a sua própria chave de IA.</p>
         </div>
       </section>
 
@@ -226,10 +205,6 @@
           <div class="section__head">
             <p class="eyebrow reveal">Veja funcionando</p>
             <h2 id="demo-title" class="reveal">É assim que “perguntar antes” se parece.</h2>
-            <p class="lede reveal">
-              Uma tarefa, reproduzida no painel lateral. O Planner propõe e espera, abas somente leitura fazem a
-              pesquisa, e o único passo que gasta dinheiro para e pede um sim antes de acontecer.
-            </p>
           </div>
 
           <div class="demo reveal">
@@ -375,13 +350,8 @@
       <section id="features" class="section" aria-labelledby="features-title">
         <div class="container">
           <div class="section__head">
-            <p class="eyebrow reveal">O que ela realmente faz</p>
-            <h2 id="features-title" class="reveal">A parte interessante de um agente é onde ele para.</h2>
-            <p class="lede reveal">
-              A maioria dos agentes de navegador pede sua sessão logada e sai agindo. A Flowkite é construída ao
-              contrário: cada item abaixo é um ponto onde ela devolve o controle a você, ou se recusa a gastar algo que
-              você não autorizou.
-            </p>
+            <p class="eyebrow reveal">Recursos</p>
+            <h2 id="features-title" class="reveal">Faz o trabalho, e você continua no controle.</h2>
           </div>
 
           <ul class="grid grid--3" role="list">
@@ -392,94 +362,47 @@
                   <path d="m16 17 2.2 2.2L23 14" stroke-linecap="round" stroke-linejoin="round" />
                 </svg>
               </span>
-              <h3>Prévia do plano, depois desfazer</h3>
-              <p>
-                Antes de tocar numa página, o agente escreve seu plano e espera. Aprove e ele executa; rejeite e nada
-                aconteceu.
-              </p>
-              <p>
-                Desfazer reverte o último passo, a página navega de volta <em>e</em> o agente esquece o passo, então
-                replaneja a partir do estado restaurado em vez de construir sobre algo que você recusou.
-              </p>
+              <h3>Plano primeiro</h3>
+              <p>Ele mostra o plano e espera o seu OK.</p>
             </li>
-
             <li class="plate reveal">
               <span class="glyph" aria-hidden="true">
                 <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7">
-                  <path
-                    d="M12 3 4.5 6v5.6c0 4.3 3 8.2 7.5 9.4 4.5-1.2 7.5-5.1 7.5-9.4V6L12 3Z"
-                    stroke-linejoin="round" />
+                  <path d="M12 3 4.5 6v5.6c0 4.3 3 8.2 7.5 9.4 4.5-1.2 7.5-5.1 7.5-9.4V6L12 3Z" stroke-linejoin="round" />
                   <path d="M12 9v3.5M12 16h.01" stroke-linecap="round" />
                 </svg>
               </span>
-              <h3>Ações sensíveis precisam de um sim</h3>
-              <p>
-                Comprar, apagar, enviar um formulário, baixar um arquivo ou digitar num campo de senha: tudo isso para
-                e pergunta primeiro.
-              </p>
-              <p>
-                A checagem lê o <em>elemento real do DOM que o agente escolheu</em>, o rótulo, o tipo, o aria-label, e não a descrição do modelo sobre o que ele acha que está fazendo.
-              </p>
+              <h3>Pergunta antes de gastar</h3>
+              <p>Comprar, excluir ou digitar uma senha sempre precisa do seu sim.</p>
             </li>
-
             <li class="plate reveal">
               <span class="glyph" aria-hidden="true">
                 <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7">
-                  <rect x="4" y="4" width="16" height="16" rx="3.5" />
-                  <path d="M9 9h6v6H9z" stroke-linejoin="round" />
-                  <path d="M9 2v2M15 2v2M9 20v2M15 20v2M2 9h2M2 15h2M20 9h2M20 15h2" stroke-linecap="round" />
+                  <path d="M5 3.5 19 11l-6.2 1.7L10 19 5 3.5Z" stroke-linejoin="round" />
                 </svg>
               </span>
-              <h3>Memória que fica no seu aparelho</h3>
-              <p>
-                Diga uma preferência uma vez e ela persiste entre sessões. As memórias vivem em
-                <code>chrome.storage.local</code>, nunca enviadas à Flowkite, nunca sincronizadas. Com a memória ativada, as que correspondem ao site entram no prompt enviado ao seu próprio provedor de LLM.
-              </p>
-              <p>
-                As configurações listam cada fato guardado com um botão de apagar ao lado, e um único interruptor
-                desliga tudo.
-              </p>
+              <h3>Veja ele trabalhar</h3>
+              <p>Um cursor com o nome Flowkite mostra cada clique, e cada troca de página é avisada.</p>
             </li>
-
             <li class="plate reveal">
               <span class="glyph" aria-hidden="true">
                 <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7">
-                  <rect x="2.5" y="6" width="12" height="12" rx="2.5" />
-                  <path d="M7 3.5h11A3.5 3.5 0 0 1 21.5 7v10" stroke-linecap="round" />
-                  <path d="M6 11h5M6 14h3" stroke-linecap="round" />
+                  <path d="M13 2.5 4.5 13.5H11l-1 8 8.5-11H12l1-8Z" stroke-linejoin="round" />
                 </svg>
               </span>
-              <h3>Pesquisa em abas paralelas</h3>
-              <p>
-                Consultas independentes, o mesmo produto em três lojas, rodam ao mesmo tempo, cada uma na sua aba em
-                segundo plano, e se fundem numa única resposta.
-              </p>
-              <p>
-                Essas abas são somente leitura <em>por construção</em>: o conjunto de ações que recebem não contém
-                clique, digitação nem envio. O único lugar onde você não poderia intervir é o único onde nada pode
-                agir.
-              </p>
+              <h3>Skills</h3>
+              <p>Roteiros prontos para pesquisa, compras, formulários e mais. Digite / para escolher um.</p>
             </li>
-
             <li class="plate reveal">
               <span class="glyph" aria-hidden="true">
                 <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7">
-                  <path d="M3 7h4l3.5 10H14" stroke-linecap="round" stroke-linejoin="round" />
-                  <path d="M3 17h4L10.5 7H14" stroke-linecap="round" stroke-linejoin="round" />
-                  <path d="M17 4.5 21 7l-4 2.5M17 14.5 21 17l-4 2.5" stroke-linecap="round" stroke-linejoin="round" />
+                  <rect x="3" y="5" width="18" height="15" rx="2.5" />
+                  <path d="M3 9.5h18M8.5 5v4.5" stroke-linecap="round" />
                 </svg>
               </span>
-              <h3>Roteamento híbrido, menos tokens</h3>
-              <p>
-                Atribua um modelo barato opcional e os passos rotineiros de navegação vão para ele, enquanto o seu
-                modelo bom cuida do raciocínio.
-              </p>
-              <p>
-                Tudo que não é rotina escala: uma falha a recuperar, uma página densa, um passo que raciocina sobre uma
-                captura de tela, o primeiro passo de um plano novo.
-              </p>
+              <h3>Uma aba, um Flowkite</h3>
+              <p>Cada aba tem o seu próprio painel, e o agente fica naquela aba.</p>
             </li>
-
             <li class="plate reveal">
               <span class="glyph" aria-hidden="true">
                 <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7">
@@ -488,135 +411,19 @@
                   <path d="M12 14v2.5" stroke-linecap="round" />
                 </svg>
               </span>
-              <h3>Guarda-corpos para texto não confiável</h3>
-              <p>
-                O conteúdo da página é envolvido em delimitadores explícitos e escaneado antes de chegar ao modelo,
-                então um texto qualquer numa página não consegue se passar por instrução ao agente.
-              </p>
-              <p>
-                Padrões conhecidos de injeção de prompt e de sequestro de tarefa são removidos, e strings sensíveis são
-                capturadas na saída.
-              </p>
-            </li>
-          
-            <li class="plate reveal">
-              <span class="glyph" aria-hidden="true">
-                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7">
-                  <path d="M4 12h11" stroke-linecap="round" />
-                  <path d="m11 8 4 4-4 4" stroke-linecap="round" stroke-linejoin="round" />
-                  <path d="M19 4v16" stroke-linecap="round" />
-                </svg>
-              </span>
-              <h3>Corrija sem precisar parar</h3>
-              <p>
-                Ver o agente pegar o caminho errado no terceiro passo deixava você com um único botão: parar, e perder
-                tudo o que ele já tinha descoberto. Agora basta digitar.
-              </p>
-              <p>
-                A correção mantém o progresso do plano e substitui a direção. Ela entra na virada do passo, nunca por
-                baixo de uma chamada ao modelo já em andamento, e o plano é reescrito para que a rota antiga não
-                contradiga a sua.
-              </p>
-            </li>
-
-            <li class="plate reveal">
-              <span class="glyph" aria-hidden="true">
-                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7">
-                  <path d="M17.5 9.5 10 17a3.5 3.5 0 0 1-5-5l8-8a2.5 2.5 0 0 1 3.5 3.5l-8 8" stroke-linecap="round" stroke-linejoin="round" />
-                </svg>
-              </span>
-              <h3>Entregue um arquivo para ele enviar</h3>
-              <p>
-                Anexe um currículo, uma nota fiscal, uma foto, e o agente coloca o arquivo no campo de upload da página,
-                inclusive nos botões estilizados que escondem o input de verdade em outro canto do markup.
-              </p>
-              <p>
-                Os bytes ficam no armazenamento de sessão, somem quando o Chrome fecha, e nunca entram no prompt. Todo
-                envio pergunta antes: o arquivo sai da sua máquina no instante em que a ação roda.
-              </p>
-            </li>
-
-            <li class="plate reveal">
-              <span class="glyph" aria-hidden="true">
-                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7">
-                  <path d="M12 6v6l3.5 2" stroke-linecap="round" stroke-linejoin="round" />
-                  <circle cx="12" cy="12" r="8.5" />
-                </svg>
-              </span>
-              <h3>Monitore uma página e só ouça quando algo mudar</h3>
-              <p>
-                Uma tarefa diária pode rodar por agendamento sem ninguém olhando. Ative o monitoramento e ela compara o
-                que coletou com a execução anterior, avisando só quando algo realmente mudou.
-              </p>
-              <p>
-                Um preço que mudou aparece como uma linha alterada, não como uma exclusão mais uma inserção. Respostas
-                em texto nunca são comparadas: o modelo reescreve o mesmo fato toda manhã, e isso avisaria você toda
-                manhã.
-              </p>
+              <h3>Suas chaves são suas</h3>
+              <p>Sem servidor, sem conta. Suas chaves e seus dados ficam no seu navegador.</p>
             </li>
           </ul>
         </div>
       </section>
 
-      <!-- ────────────────────────── how it works ───────────────────────── -->
-      <section id="how" class="section section--sunk" aria-labelledby="how-title">
-        <div class="container">
-          <div class="section__head">
-            <p class="eyebrow reveal">Como funciona</p>
-            <h2 id="how-title" class="reveal">Dois agentes, um navegador, nenhum servidor.</h2>
-            <p class="lede reveal">
-              A Flowkite divide o trabalho em dois papéis: um decide o que fazer, o outro faz. Tudo roda dentro do
-              service worker da extensão, na sua máquina, a única coisa que sai é a requisição ao provedor de modelo
-              que você configurou.
-            </p>
-          </div>
-
-          <ol class="grid grid--3" role="list">
-            <li class="plate step reveal">
-              <span class="step__num" aria-hidden="true">1</span>
-              <h3>Planner</h3>
-              <p>
-                Lê sua tarefa e define a abordagem, quais sites, em que ordem, como será o “pronto”. Replaneja quando
-                a página se revela diferente do que todos esperavam.
-              </p>
-              <p class="step__meta">Decide quando a tarefa terminou. Obrigatório.</p>
-            </li>
-
-            <li class="plate step reveal">
-              <span class="step__num" aria-hidden="true">2</span>
-              <h3>Navigator</h3>
-              <p>
-                Faz o trabalho de verdade na página: lê o DOM, clica, digita, rola, navega. Iframes de outras origens
-                também são lidos, então widgets embutidos de checkout e login não ficam invisíveis para ele.
-              </p>
-              <p class="step__meta">
-                Se a página re-renderiza no meio de um passo, a ação é repetida contra o estado novo. Passos rotineiros
-                podem ir para um modelo mais barato que você indicar; o que for mais difícil fica com o seu bom.
-              </p>
-            </li>
-          </ol>
-
-          <div class="well well--wide reveal">
-            <p>
-              <strong>O portão do plano fica na frente dos dois.</strong> O primeiro plano de cada tarefa é mostrado a
-              você e espera aprovação, e só o primeiro, para que replanejar no meio não vire amolação. Com as coisas
-              andando, desfazer é a saída de emergência: leva a página de volta e apaga o passo do histórico do agente,
-              então o próximo plano é construído sobre o estado que você manteve, não sobre o que você rejeitou.
-            </p>
-          </div>
-        </div>
-      </section>
-
       <!-- ─────────────────────────── providers ─────────────────────────── -->
-      <section id="providers" class="section" aria-labelledby="providers-title">
+      <section id="providers" class="section section--sunk" aria-labelledby="providers-title">
         <div class="container">
           <div class="section__head">
-            <p class="eyebrow reveal">Traga seu próprio modelo</p>
-            <h2 id="providers-title" class="reveal">Onze provedores, mais qualquer um compatível com a OpenAI.</h2>
-            <p class="lede reveal">
-              Atribua um modelo a cada papel, Planner, Navigator e, opcionalmente, um modelo Fast barato para passos
-              rotineiros. Misture fornecedores à vontade; nada pressupõe que vieram do mesmo lugar.
-            </p>
+            <p class="eyebrow reveal">Use o seu próprio modelo</p>
+            <h2 id="providers-title" class="reveal">Funciona com a IA que você já usa.</h2>
           </div>
 
           <ul class="chips reveal" role="list">
@@ -633,166 +440,113 @@
             <li class="chip">Ollama <span class="chip__tag">local</span></li>
             <li class="chip">Qualquer endpoint compatível com a OpenAI</li>
           </ul>
-
-          <div class="well well--wide reveal">
-            <p>
-              As chaves ficam guardadas localmente em <code>chrome.storage.local</code> e vão direto do seu navegador
-              ao provedor escolhido. Nunca passam por um servidor da Flowkite, porque ele não existe, sem backend, sem
-              conta, sem cadastro. Se o seu endpoint fala a API da OpenAI, aponte a Flowkite para a URL base e
-              funciona, inclusive um modelo rodando na sua própria máquina via Ollama.
-            </p>
-          </div>
         </div>
       </section>
 
       <!-- ─────────────────────────── quickstart ────────────────────────── -->
-      <section id="quickstart" class="section section--sunk" aria-labelledby="quickstart-title">
+      <section id="quickstart" class="section" aria-labelledby="quickstart-title">
         <div class="container">
           <div class="section__head">
-            <p class="eyebrow reveal">Quickstart</p>
-            <h2 id="quickstart-title" class="reveal">Instale no Chrome e adicione uma chave.</h2>
-            <p class="lede reveal">
-              Cerca de dois minutos. Quase todo mundo deve seguir o primeiro caminho; o segundo existe para quem
-              prefere ficar com os arquivos na mão, e instala exatamente o mesmo build.
-            </p>
+            <p class="eyebrow reveal">Instalar</p>
+            <h2 id="quickstart-title" class="reveal">Pronto em dois minutos.</h2>
           </div>
 
-          <ol class="install" role="list">
+          <ol class="install grid grid--3" role="list">
             <li class="well reveal">
               <h3><span class="install__num" aria-hidden="true">1</span> Instale no Chrome</h3>
-              <p>Um clique na Chrome Web Store, e o Chrome mantém tudo atualizado sozinho. O Flowkite aparece na barra de ferramentas quando terminar.</p>
+              <p>Um clique na Chrome Web Store.</p>
               <p class="cta cta--inline">
                 <a class="key" href="https://chromewebstore.google.com/detail/flowkite-ai-web-agent-aut/kacmblccfhnfcjfpeageldmmbkocafab" rel="noopener noreferrer">Instalar no Chrome</a>
               </p>
             </li>
-
             <li class="well reveal">
-              <h3><span class="install__num" aria-hidden="true">2</span> Adicione uma chave de API e atribua os modelos</h3>
-              <p>Abra o painel lateral, clique no ícone de configurações, cole uma chave de qualquer provedor suportado e dê um modelo para o Planner e outro para o Navigator. Adicione um modelo Fast barato se quiser desviar os passos rotineiros do seu modelo caro.</p>
-              <p class="note">Aprovação de plano e confirmação de ação sensível vêm ligadas. Deixe assim até confiar.</p>
+              <h3><span class="install__num" aria-hidden="true">2</span> Adicione sua chave de IA</h3>
+              <p>Abra as Configurações no painel lateral e cole uma chave.</p>
+            </li>
+            <li class="well reveal">
+              <h3><span class="install__num" aria-hidden="true">3</span> Peça</h3>
+              <p>Digite o que você precisa e aprove o plano.</p>
             </li>
           </ol>
 
-          <div class="well reveal" id="manual-install">
-            <h3>Prefere instalar na mão?</h3>
-            <p>Baixe o build e carregue você mesmo. São os mesmos arquivos que a loja entrega. A diferença é que o Chrome não vai atualizar para você: quando sair uma versão nova, baixe de novo e troque a pasta.</p>
-            <ol class="install install--compact" role="list">
-              <li><p>Baixe o <a href="/flowkite.zip" download><strong>flowkite.zip</strong></a> e descompacte. Guarde a pasta num lugar que você não vai apagar sem querer, porque o Chrome carrega dali mesmo.</p></li>
+          <details class="faq__item reveal" id="manual-install">
+            <summary>
+              <span>Prefere instalar pelo zip?</span>
+              <span class="faq__icon" aria-hidden="true"></span>
+            </summary>
+            <div class="faq__body">
+              <ol class="install install--compact" role="list">
               <li>
-                <p>Cole isto na barra de endereços. Não é um link que uma página da web tenha permissão de abrir para você.</p>
+                <p>Baixe o <a href="/flowkite.zip" download><strong>flowkite.zip</strong></a> e descompacte.</p>
+              </li>
+              <li>
+                <p>Abra este endereço:</p>
                 <pre class="code"><code>chrome://extensions/</code></pre>
               </li>
-              <li><p>Ligue o <strong>Modo do desenvolvedor</strong> no canto superior direito. Sem ele, o Chrome não oferece o botão Carregar sem compactação.</p></li>
-              <li><p>Clique em <strong>Carregar sem compactação</strong> e escolha a pasta descompactada em si, não um arquivo dentro dela. Depois siga do passo 2 acima.</p></li>
-            </ol>
-          </div>
-
-          <div class="cta reveal">
-            <a class="key" href="https://chromewebstore.google.com/detail/flowkite-ai-web-agent-aut/kacmblccfhnfcjfpeageldmmbkocafab" rel="noopener noreferrer">Instalar no Chrome</a>
-            <a class="key key--ghost" href="/flowkite.zip" download>Baixar o zip</a>
-          </div>
+              <li>
+                <p>Ative o <strong>Modo do desenvolvedor</strong> (canto superior direito).</p>
+              </li>
+              <li>
+                <p>Clique em <strong>Carregar sem compactação</strong> e escolha a pasta descompactada.</p>
+              </li>
+              </ol>
+            </div>
+          </details>
         </div>
       </section>
 
       <!-- ────────────────────────────── faq ────────────────────────────── -->
-      <section id="faq" class="section" aria-labelledby="faq-title">
+      <section id="faq" class="section section--sunk" aria-labelledby="faq-title">
         <div class="container container--narrow">
           <div class="section__head">
-            <p class="eyebrow reveal">Respostas diretas</p>
-            <h2 id="faq-title" class="reveal">Perguntas frequentes, respondidas com franqueza.</h2>
+            <p class="eyebrow reveal">FAQ</p>
+            <h2 id="faq-title" class="reveal">Respostas rápidas.</h2>
           </div>
 
           <div class="faq">
             <details class="faq__item reveal" id="faq-free">
               <summary>
-                <span>É gratuito?</span>
+                <span>É grátis?</span>
                 <span class="faq__icon" aria-hidden="true"></span>
               </summary>
               <div class="faq__body">
-                <p>
-                  A extensão é gratuita para baixar, sem plano pago, sem trial e sem conta. O que custa dinheiro é o
-                  modelo: você traz sua própria chave de API e o provedor cobra diretamente de você pelo que o agente
-                  usa. Rodando um modelo local via Ollama, até isso cai para zero.
-                </p>
+                <p>Sim. Sem plano pago e sem conta. Você só paga ao seu provedor de IA pelo que usar, e nada com um modelo local via Ollama.</p>
               </div>
             </details>
-
             <details class="faq__item reveal" id="faq-keys">
               <summary>
-                <span>Para onde vão minhas chaves de API?</span>
+                <span>Para onde vão as minhas chaves de API?</span>
                 <span class="faq__icon" aria-hidden="true"></span>
               </summary>
               <div class="faq__body">
-                <p>
-                  Para o <code>chrome.storage.local</code> na sua própria máquina, e para nenhum outro lugar. As
-                  requisições vão direto do seu navegador ao provedor configurado. A Flowkite não tem backend para
-                  intermediá-las, então não existe servidor nosso que pudesse ver uma chave. Desinstale a extensão e
-                  elas somem junto.
-                </p>
+                <p>Elas ficam no seu navegador e vão direto para o seu provedor de IA. Não existe servidor do Flowkite.</p>
               </div>
             </details>
-
+            <details class="faq__item reveal" id="faq-data">
+              <summary>
+                <span>Quais dados saem da minha máquina?</span>
+                <span class="faq__icon" aria-hidden="true"></span>
+              </summary>
+              <div class="faq__body">
+                <p>Só o que a tarefa precisa: a página em que ele está trabalhando, os títulos das suas abas abertas e capturas de tela quando a visão está ligada, enviados ao provedor de IA que você escolheu. A <a href="/privacy-policy/" hreflang="en">política de privacidade</a> tem os detalhes.</p>
+              </div>
+            </details>
             <details class="faq__item reveal" id="faq-local-models">
               <summary>
                 <span>Funciona com modelos locais?</span>
                 <span class="faq__icon" aria-hidden="true"></span>
               </summary>
               <div class="faq__body">
-                <p>
-                  Sim, o Ollama é suportado diretamente, e qualquer endpoint compatível com a OpenAI funciona
-                  informando a URL base. Essa configuração tem custo zero de API e nada sai da sua máquina. Uma
-                  ressalva: modelos locais pedem prompts mais específicos. Divida a tarefa em passos explícitos em vez
-                  de entregar uma única instrução vaga de alto nível.
-                </p>
+                <p>Sim, via Ollama ou qualquer endpoint compatível com a OpenAI.</p>
               </div>
             </details>
-
-            <details class="faq__item reveal" id="faq-web-store">
-              <summary>
-                <span>Está na Chrome Web Store?</span>
-                <span class="faq__icon" aria-hidden="true"></span>
-              </summary>
-              <div class="faq__body">
-                <p>
-                  Sim — um clique na
-                  <a href="https://chromewebstore.google.com/detail/flowkite-ai-web-agent-aut/kacmblccfhnfcjfpeageldmmbkocafab" rel="noopener noreferrer">Chrome Web Store</a>, e o Chrome mantém a
-                  extensão atualizada para você. Se preferir não passar pela loja, o zip desta página instala com
-                  <strong>Carregar sem compactação</strong> — atualizar essa cópia significa substituir a pasta e
-                  apertar atualizar no cartão da Flowkite em <code>chrome://extensions</code>. Veja o
-                  <a href="#quickstart">Comece rápido</a> para a sequência completa.
-                </p>
-              </div>
-            </details>
-
-            <details class="faq__item reveal" id="faq-data">
-              <summary>
-                <span>Que dados saem da minha máquina?</span>
-                <span class="faq__icon" aria-hidden="true"></span>
-              </summary>
-              <div class="faq__body">
-                <p>
-                  A estrutura da página e, apenas se você ligar a visão, capturas de tela, enviadas ao provedor de
-                  LLM que você escolheu usando a sua chave; quando os dados chegam a ele, vale a política dele, então
-                  escolha um com o qual você se sinta confortável. Builds que incluem uma chave de analytics também
-                  enviam eventos anônimos de uso ao PostHog, tarefa iniciada, concluída, falhada ou cancelada, mais o
-                  hostname de cada domínio visitado, que <strong>Opções → Analytics</strong> desliga; uma cópia
-                  compilada por você não carrega chave nenhuma, então isso nunca roda. Suas configurações, histórico de
-                  tarefas, chaves de API e memórias ficam no <code>chrome.storage.local</code> e nunca são enviados.
-                </p>
-              </div>
-            </details>
-
             <details class="faq__item reveal" id="faq-browsers">
               <summary>
                 <span>Quais navegadores são suportados?</span>
                 <span class="faq__icon" aria-hidden="true"></span>
               </summary>
               <div class="faq__body">
-                <p>
-                  Chrome e Edge são totalmente suportados. Firefox e Safari não, a Flowkite é uma extensão Manifest V3
-                  construída sobre as APIs do próprio Chrome. Outros navegadores Chromium como Brave, Arc e Opera podem
-                  até funcionar, mas não são testados.
-                </p>
+                <p>Chrome e Edge.</p>
               </div>
             </details>
           </div>
@@ -808,10 +562,7 @@
             <img src="/mark.png" alt="" width="32" height="32" decoding="async" />
             <div>
               <p class="footer__name">Flowkite</p>
-              <p class="footer__meta">
-                Grátis para baixar, sob a licença Apache&nbsp;2.0. Controle com humano no circuito, rodando com as suas
-                próprias chaves de API.
-              </p>
+              <p class="footer__meta">Grátis e de código aberto, sob a licença Apache&nbsp;2.0.</p>
             </div>
           </div>
 
@@ -828,10 +579,7 @@
           </nav>
         </div>
 
-        <p class="footer__fine">
-          Roda localmente no seu navegador. Sem contas, sem backend, e qualquer analytics de uso pode ser desligado.
-          Sem afiliação com nenhum provedor de modelo.
-        </p>
+        <p class="footer__fine">Roda no seu navegador. Sem conta, sem servidor. Sem afiliação com nenhum provedor de IA.</p>
       </div>
     </footer>
 

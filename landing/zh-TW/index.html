@@ -70,10 +70,10 @@
         "mainEntity": [
           {
             "@type": "Question",
-            "name": "它是免費的嗎？",
+            "name": "免費嗎？",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "擴充功能本身免費下載，沒有付費方案、沒有試用期、不用註冊帳號。要花錢的是模型：你帶自己的 API 金鑰，由供應商直接向你收費。透過 Ollama 跑本機模型的話，連這筆錢也歸零。"
+              "text": "是的。沒有付費方案，也不需要帳號。你只需支付 AI 供應商的用量費用，透過 Ollama 使用本機模型則完全免費。"
             }
           },
           {
@@ -81,23 +81,7 @@
             "name": "我的 API 金鑰會去哪裡？",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "存進你電腦上的 chrome.storage.local，僅此而已。請求從你的瀏覽器直達你設定的供應商。Flowkite 沒有後端可以代理它們。解除安裝擴充功能，金鑰也跟著消失。"
-            }
-          },
-          {
-            "@type": "Question",
-            "name": "支援本機模型嗎？",
-            "acceptedAnswer": {
-              "@type": "Answer",
-              "text": "支援，Ollama 有直接支援，任何相容 OpenAI API 的端點只要提供 base URL 就能用。這種配置 API 成本為零，資料也完全不離開你的電腦。本機模型需要更明確的提示：把任務拆成清楚的步驟。"
-            }
-          },
-          {
-            "@type": "Question",
-            "name": "上架 Chrome 線上應用程式商店了嗎？",
-            "acceptedAnswer": {
-              "@type": "Answer",
-              "text": "已經上架了。從 Chrome 線上應用程式商店一鍵安裝，Chrome 會幫你保持更新。若不想透過商店，本站的 zip 可以用「載入未封裝項目」安裝；這種安裝方式升級時要替換資料夾，然後在 chrome://extensions 的 Flowkite 卡片上按重新整理。"
+              "text": "金鑰留在你的瀏覽器，並直接送到你的 AI 供應商。Flowkite 沒有伺服器。"
             }
           },
           {
@@ -105,7 +89,15 @@
             "name": "哪些資料會離開我的電腦？",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "頁面結構，以及，只有在你開啟視覺功能時，螢幕截圖，用你的金鑰送往你選擇的 LLM 供應商。附帶分析金鑰的建置版本也會向 PostHog 傳送匿名使用事件，可在 選項 → Analytics 關閉；你自己編譯的版本不含金鑰，因此完全不會執行。設定、任務歷史、API 金鑰與記憶都留在 chrome.storage.local。"
+              "text": "只有任務需要的內容：正在處理的頁面、你開啟的分頁標題，以及開啟視覺功能時的螢幕截圖，送到你選擇的 AI 供應商。詳細內容請見隱私權政策。"
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "可以使用本機模型嗎？",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "可以，透過 Ollama 或任何相容 OpenAI 的端點。"
             }
           },
           {
@@ -113,7 +105,7 @@
             "name": "支援哪些瀏覽器？",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "完整支援 Chrome 與 Edge。Firefox 與 Safari 不支援，Flowkite 是建立在 Chrome 自家 API 上的 Manifest V3 擴充功能。其他 Chromium 系瀏覽器如 Brave、Arc、Opera 或許能用，但未經測試。"
+              "text": "Chrome 和 Edge。"
             }
           }
         ]
@@ -136,9 +128,7 @@
         <nav class="nav__links" aria-label="主導覽">
           <a class="nav__link" href="#demo">示範</a>
           <a class="nav__link" href="#features">功能</a>
-          <a class="nav__link" href="#how">運作方式</a>
-          <a class="nav__link" href="#providers">模型供應商</a>
-          <a class="nav__link" href="#quickstart">快速開始</a>
+          <a class="nav__link" href="#quickstart">安裝</a>
           <a class="nav__link" href="#faq">常見問題</a>
           <span class="nav__langs" role="group" aria-label="語言">
             <a class="nav__lang" href="/" lang="en">EN</a>
@@ -158,9 +148,7 @@
           <div class="nav__sheet-card">
             <a class="nav__sheet-link" href="#demo">示範</a>
             <a class="nav__sheet-link" href="#features">功能</a>
-            <a class="nav__sheet-link" href="#how">運作方式</a>
-            <a class="nav__sheet-link" href="#providers">模型供應商</a>
-            <a class="nav__sheet-link" href="#quickstart">快速開始</a>
+            <a class="nav__sheet-link" href="#quickstart">安裝</a>
             <a class="nav__sheet-link" href="#faq">常見問題</a>
             <span class="nav__sheet-langs" role="group" aria-label="語言">
               <a class="nav__sheet-lang" href="/" lang="en">EN</a>
@@ -179,14 +167,11 @@
         <div class="hero__veil" aria-hidden="true"></div>
 
         <div class="container hero__inner">
-          <p class="eyebrow reveal">免費 AI 網頁自動化 · 多代理 · 本機優先</p>
+          <p class="eyebrow reveal">免費的 AI 瀏覽器代理</p>
 
           <h1 id="hero-title" class="hero__title reveal">一個<em>會先問過你</em>的瀏覽器代理。</h1>
 
-          <p class="hero__lede reveal">
-            用日常語言描述任務，Flowkite 就在你自己的瀏覽器裡完成它，Planner 想好做法，Navigator
-            負責點擊和輸入，你在側邊面板看著整個過程發生。它在碰任何頁面之前先給你看計畫，遇到不可逆的事情會停下來問，資料直接送往你選擇的模型供應商、用的是你自己的金鑰。中間沒有任何 Flowkite 伺服器。
-          </p>
+          <p class="hero__lede reveal">告訴它你要做什麼。Flowkite 會在你的瀏覽器裡完成，遇到重要的事會先問你。</p>
 
           <p class="hero__try reveal">
             <span class="hero__try-label">試著這樣問：</span>
@@ -209,13 +194,10 @@
               </svg>
               加到 Chrome
             </a>
-            <a class="key key--ghost" href="#quickstart">或自行安裝</a>
+            <a class="key key--ghost" href="/flowkite.zip" download>下載 zip</a>
           </div>
 
-          <p class="hero__note reveal">
-            免費下載，而且會一直免費。不想走商店？下載
-            <a href="/flowkite.zip" download>zip</a>，在 <code>chrome://extensions</code> 自行載入。
-          </p>
+          <p class="hero__note reveal">免費、免帳號，使用你自己的 AI 金鑰。</p>
         </div>
       </section>
 
@@ -225,9 +207,6 @@
           <div class="section__head">
             <p class="eyebrow reveal">看它運作</p>
             <h2 id="demo-title" class="reveal">「先問過你」長這個樣子。</h2>
-            <p class="lede reveal">
-              一項任務，在側邊面板重播。Planner 提出計畫後等待，唯讀分頁負責查資料，唯一會花錢的那一步，在發生之前停下來等你點頭。
-            </p>
           </div>
 
           <div class="demo reveal">
@@ -371,11 +350,8 @@
       <section id="features" class="section" aria-labelledby="features-title">
         <div class="container">
           <div class="section__head">
-            <p class="eyebrow reveal">它實際做的事</p>
-            <h2 id="features-title" class="reveal">代理最有意思的部分，是它在哪裡停下來。</h2>
-            <p class="lede reveal">
-              多數瀏覽器代理跟你要已登入的工作階段，然後就開始動手。Flowkite 反著造：下面每一項，都是它把控制權交還給你、或拒絕花掉你沒同意的東西的地方。
-            </p>
+            <p class="eyebrow reveal">功能</p>
+            <h2 id="features-title" class="reveal">幫你做事，決定權在你。</h2>
           </div>
 
           <ul class="grid grid--3" role="list">
@@ -386,78 +362,47 @@
                   <path d="m16 17 2.2 2.2L23 14" stroke-linecap="round" stroke-linejoin="round" />
                 </svg>
               </span>
-              <h3>先看計畫，之後可復原</h3>
-              <p>代理在碰任何頁面之前，先把計畫寫出來等你。你核准它才跑；你拒絕，就什麼都沒發生。</p>
-              <p>
-                復原會回退最後一步，頁面退回去，<em>而且</em>代理忘掉那一步，於是它從還原後的狀態重新規劃，而不是疊在你否決的東西上面。
-              </p>
+              <h3>先給計畫</h3>
+              <p>先讓你看計畫，等你同意才動手。</p>
             </li>
-
             <li class="plate reveal">
               <span class="glyph" aria-hidden="true">
                 <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7">
-                  <path
-                    d="M12 3 4.5 6v5.6c0 4.3 3 8.2 7.5 9.4 4.5-1.2 7.5-5.1 7.5-9.4V6L12 3Z"
-                    stroke-linejoin="round" />
+                  <path d="M12 3 4.5 6v5.6c0 4.3 3 8.2 7.5 9.4 4.5-1.2 7.5-5.1 7.5-9.4V6L12 3Z" stroke-linejoin="round" />
                   <path d="M12 9v3.5M12 16h.01" stroke-linecap="round" />
                 </svg>
               </span>
-              <h3>敏感操作要你點頭</h3>
-              <p>購買、刪除、送出表單、下載檔案、在密碼欄輸入，全都會先停下來問你。</p>
-              <p>
-                這個檢查讀的是<em>代理實際選中的 DOM 元素</em>，它的標籤、型別、aria-label，而不是模型自認為在做什麼的描述。
-              </p>
+              <h3>花錢前先問</h3>
+              <p>購買、刪除或輸入密碼，一定要你點頭。</p>
             </li>
-
             <li class="plate reveal">
               <span class="glyph" aria-hidden="true">
                 <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7">
-                  <rect x="4" y="4" width="16" height="16" rx="3.5" />
-                  <path d="M9 9h6v6H9z" stroke-linejoin="round" />
-                  <path d="M9 2v2M15 2v2M9 20v2M15 20v2M2 9h2M2 15h2M20 9h2M20 15h2" stroke-linecap="round" />
+                  <path d="M5 3.5 19 11l-6.2 1.7L10 19 5 3.5Z" stroke-linejoin="round" />
                 </svg>
               </span>
-              <h3>留在你裝置上的記憶</h3>
-              <p>
-                偏好講一次，往後的工作階段都記得。記憶存在
-                <code>chrome.storage.local</code>，絕不會上傳到 Flowkite、永不同步。啟用記憶後，與該網站相符的記憶會進入送往你自己的 LLM 供應商的提示中。
-              </p>
-              <p>設定頁列出每一條存下的事實，旁邊就是刪除鍵，還有一個開關能整個關掉。</p>
+              <h3>看得見它在做什麼</h3>
+              <p>標著 Flowkite 的游標會顯示每次點擊，換頁時也會告訴你。</p>
             </li>
-
             <li class="plate reveal">
               <span class="glyph" aria-hidden="true">
                 <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7">
-                  <rect x="2.5" y="6" width="12" height="12" rx="2.5" />
-                  <path d="M7 3.5h11A3.5 3.5 0 0 1 21.5 7v10" stroke-linecap="round" />
-                  <path d="M6 11h5M6 14h3" stroke-linecap="round" />
+                  <path d="M13 2.5 4.5 13.5H11l-1 8 8.5-11H12l1-8Z" stroke-linejoin="round" />
                 </svg>
               </span>
-              <h3>平行分頁查資料</h3>
-              <p>
-                彼此獨立的查詢，同一件商品在三家店，同時進行，各自在背景分頁裡跑，最後合併成一個答案。
-              </p>
-              <p>
-                這些分頁<em>從構造上</em>就是唯讀的：交給它們的動作集合裡沒有點擊、沒有輸入、沒有送出。
-                你唯一無法介入的地方，正是什麼都動不了的地方。
-              </p>
+              <h3>技能</h3>
+              <p>研究、購物、填表等現成流程。輸入 / 就能選。</p>
             </li>
-
             <li class="plate reveal">
               <span class="glyph" aria-hidden="true">
                 <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7">
-                  <path d="M3 7h4l3.5 10H14" stroke-linecap="round" stroke-linejoin="round" />
-                  <path d="M3 17h4L10.5 7H14" stroke-linecap="round" stroke-linejoin="round" />
-                  <path d="M17 4.5 21 7l-4 2.5M17 14.5 21 17l-4 2.5" stroke-linecap="round" stroke-linejoin="round" />
+                  <rect x="3" y="5" width="18" height="15" rx="2.5" />
+                  <path d="M3 9.5h18M8.5 5v4.5" stroke-linecap="round" />
                 </svg>
               </span>
-              <h3>混合路由，更省 token</h3>
-              <p>指定一個可選的便宜模型，例行的導覽步驟就交給它，思考交給你的好模型。</p>
-              <p>
-                不例行的都會升級處理：要收拾的失敗、資訊密集的頁面、需要看截圖推理的步驟、新計畫的第一步。
-              </p>
+              <h3>一個分頁，一個 Flowkite</h3>
+              <p>每個分頁都有自己的面板，代理只在那個分頁工作。</p>
             </li>
-
             <li class="plate reveal">
               <span class="glyph" aria-hidden="true">
                 <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7">
@@ -466,117 +411,19 @@
                   <path d="M12 14v2.5" stroke-linecap="round" />
                 </svg>
               </span>
-              <h3>對不可信文字的防護欄</h3>
-              <p>
-                頁面內容會包上明確的分隔符、先掃描再交給模型，網頁上的文字沒辦法偽裝成給代理的指令。
-              </p>
-              <p>已知的提示注入與任務挾持模式會被剝除，敏感字串在送出時被攔下。</p>
-            </li>
-          
-            <li class="plate reveal">
-              <span class="glyph" aria-hidden="true">
-                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7">
-                  <path d="M4 12h11" stroke-linecap="round" />
-                  <path d="m11 8 4 4-4 4" stroke-linecap="round" stroke-linejoin="round" />
-                  <path d="M19 4v16" stroke-linecap="round" />
-                </svg>
-              </span>
-              <h3>不用停下來也能糾正它</h3>
-              <p>
-                以前看著它在第三步走錯方向，你只有一個按鈕可按：停止，然後失去它已經整理好的一切。現在你只要打字就好。
-              </p>
-              <p>
-                修正會保留計畫已完成的進度，只覆蓋方向。它在步驟交界處生效，絕不會插進一個已經送出的模型呼叫底下，而且計畫會重新產生，讓舊路線無法和你的新指示互相牴觸。
-              </p>
-            </li>
-
-            <li class="plate reveal">
-              <span class="glyph" aria-hidden="true">
-                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7">
-                  <path d="M17.5 9.5 10 17a3.5 3.5 0 0 1-5-5l8-8a2.5 2.5 0 0 1 3.5 3.5l-8 8" stroke-linecap="round" stroke-linejoin="round" />
-                </svg>
-              </span>
-              <h3>把檔案交給它上傳</h3>
-              <p>
-                附上履歷、發票或照片，代理就能把它放進頁面的上傳欄位，包括那些把真正的 input 藏在別處、只露出美化按鈕的版型。
-              </p>
-              <p>
-                檔案內容存在 session storage，Chrome 關閉就消失，而且永遠不會進入提示詞。每一次上傳都會先問你：這個動作一執行，檔案就離開你的電腦。
-              </p>
-            </li>
-
-            <li class="plate reveal">
-              <span class="glyph" aria-hidden="true">
-                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7">
-                  <path d="M12 6v6l3.5 2" stroke-linecap="round" stroke-linejoin="round" />
-                  <circle cx="12" cy="12" r="8.5" />
-                </svg>
-              </span>
-              <h3>盯著一個頁面，沒變化就不出聲</h3>
-              <p>
-                每天的任務可以照排程執行，不需要有人看著。打開監看之後，它會把這次收集到的資料和上一次比對，只有真的有變化才通知你。
-              </p>
-              <p>
-                價格變動會被讀成一列有變化，而不是一刪一增。純文字的回答一律不比對，因為模型每天早上都會用不同的說法寫同一件事，那樣等於每天都在打擾你。
-              </p>
+              <h3>金鑰留在你手上</h3>
+              <p>沒有伺服器、沒有帳號。金鑰和資料都留在你的瀏覽器。</p>
             </li>
           </ul>
         </div>
       </section>
 
-      <!-- ────────────────────────── how it works ───────────────────────── -->
-      <section id="how" class="section section--sunk" aria-labelledby="how-title">
-        <div class="container">
-          <div class="section__head">
-            <p class="eyebrow reveal">運作方式</p>
-            <h2 id="how-title" class="reveal">兩個代理，一個瀏覽器，零伺服器。</h2>
-            <p class="lede reveal">
-              Flowkite 把工作拆成兩個角色：一個決定做什麼，另一個動手做。全部都在你電腦上的擴充功能 service
-              worker 裡執行，唯一出去的東西，是發給你設定的模型供應商的請求。
-            </p>
-          </div>
-
-          <ol class="grid grid--3" role="list">
-            <li class="plate step reveal">
-              <span class="step__num" aria-hidden="true">1</span>
-              <h3>Planner</h3>
-              <p>
-                讀你的任務、想好做法，哪些網站、什麼順序、「完成」長什麼樣子。當頁面跟所有人預期的都不一樣時，它會重新規劃。
-              </p>
-              <p class="step__meta">由它決定任務何時結束。必要角色。</p>
-            </li>
-
-            <li class="plate step reveal">
-              <span class="step__num" aria-hidden="true">2</span>
-              <h3>Navigator</h3>
-              <p>
-                在頁面裡做實際的工作：讀 DOM、點擊、輸入、捲動、導覽。跨網域 iframe 也讀得到，所以內嵌的結帳和登入元件對它不是隱形的。
-              </p>
-              <p class="step__meta">
-                頁面在步驟中途重新渲染的話，動作會對新狀態重試。例行步驟可以交給你指定的便宜模型；難的留給好模型。
-              </p>
-            </li>
-          </ol>
-
-          <div class="well well--wide reveal">
-            <p>
-              <strong>計畫閘門擋在兩個代理前面。</strong>每個任務的第一份計畫都會呈給你、等你核准，而且只有第一份，所以任務中途的重新規劃不會一直煩你。開始跑之後，復原就是逃生口：它把頁面退回去、把那一步從代理的
-              歷史裡刪掉，下一份計畫蓋在你留下的狀態上，而不是你否決的那個。
-            </p>
-          </div>
-        </div>
-      </section>
-
       <!-- ─────────────────────────── providers ─────────────────────────── -->
-      <section id="providers" class="section" aria-labelledby="providers-title">
+      <section id="providers" class="section section--sunk" aria-labelledby="providers-title">
         <div class="container">
           <div class="section__head">
-            <p class="eyebrow reveal">自帶模型</p>
-            <h2 id="providers-title" class="reveal">十一家供應商，外加任何相容 OpenAI 的端點。</h2>
-            <p class="lede reveal">
-              給每個角色指定一個模型，Planner、Navigator，以及可選的便宜 Fast 模型跑例行步驟。
-              供應商隨你混搭；沒有任何地方假設它們來自同一家。
-            </p>
+            <p class="eyebrow reveal">使用你自己的模型</p>
+            <h2 id="providers-title" class="reveal">支援你已經在用的 AI。</h2>
           </div>
 
           <ul class="chips reveal" role="list">
@@ -593,154 +440,113 @@
             <li class="chip">Ollama <span class="chip__tag">本機</span></li>
             <li class="chip">任何相容 OpenAI 的端點</li>
           </ul>
-
-          <div class="well well--wide reveal">
-            <p>
-              金鑰存在本機的 <code>chrome.storage.local</code>，從你的瀏覽器直達你挑的供應商。
-              它們永遠不會經過 Flowkite 的伺服器，因為根本沒有，沒後端、沒帳號、沒有東西要註冊。
-              只要你的端點講 OpenAI API，把 base URL 指給 Flowkite 就能用，包括透過 Ollama 跑在你自己電腦上的模型。
-            </p>
-          </div>
         </div>
       </section>
 
       <!-- ─────────────────────────── quickstart ────────────────────────── -->
-      <section id="quickstart" class="section section--sunk" aria-labelledby="quickstart-title">
+      <section id="quickstart" class="section" aria-labelledby="quickstart-title">
         <div class="container">
           <div class="section__head">
-            <p class="eyebrow reveal">Quickstart</p>
-            <h2 id="quickstart-title" class="reveal">加到 Chrome，然後加一把金鑰。</h2>
-            <p class="lede reveal">
-              大約兩分鐘。幾乎所有人都該走第一條路；第二條是留給想自己保管檔案的人，裝的是完全相同的組建。
-            </p>
+            <p class="eyebrow reveal">安裝</p>
+            <h2 id="quickstart-title" class="reveal">兩分鐘就能開始。</h2>
           </div>
 
-          <ol class="install" role="list">
+          <ol class="install grid grid--3" role="list">
             <li class="well reveal">
               <h3><span class="install__num" aria-hidden="true">1</span> 加到 Chrome</h3>
-              <p>在 Chrome 線上應用程式商店點一下即可，之後 Chrome 會自動保持更新。完成後 Flowkite 會出現在工具列。</p>
+              <p>在 Chrome 線上應用程式商店按一下即可。</p>
               <p class="cta cta--inline">
                 <a class="key" href="https://chromewebstore.google.com/detail/flowkite-ai-web-agent-aut/kacmblccfhnfcjfpeageldmmbkocafab" rel="noopener noreferrer">加到 Chrome</a>
               </p>
             </li>
-
             <li class="well reveal">
-              <h3><span class="install__num" aria-hidden="true">2</span> 加入 API 金鑰並指派模型</h3>
-              <p>打開側邊面板，點設定圖示，貼上任一支援供應商的金鑰，然後分別給 Planner 和 Navigator 各一個模型。若想把例行步驟從昂貴模型分流出去，再加一個便宜的 Fast 模型。</p>
-              <p class="note">計畫核准與敏感操作確認預設都是開啟的。在你信任它之前，請維持原樣。</p>
+              <h3><span class="install__num" aria-hidden="true">2</span> 加入你的 AI 金鑰</h3>
+              <p>在側邊面板開啟「設定」，貼上金鑰。</p>
+            </li>
+            <li class="well reveal">
+              <h3><span class="install__num" aria-hidden="true">3</span> 開始使用</h3>
+              <p>輸入你要做的事，然後核准計畫。</p>
             </li>
           </ol>
 
-          <div class="well reveal" id="manual-install">
-            <h3>想自己手動安裝？</h3>
-            <p>下載組建後自行載入，檔案和商店提供的完全一樣。代價是 Chrome 不會替你更新：有新版時要再下載一次並替換資料夾。</p>
-            <ol class="install install--compact" role="list">
-              <li><p>下載 <a href="/flowkite.zip" download><strong>flowkite.zip</strong></a> 並解壓縮。請放在不會誤刪的位置，因為 Chrome 會直接從那裡載入。</p></li>
+          <details class="faq__item reveal" id="manual-install">
+            <summary>
+              <span>想改用 zip 安裝？</span>
+              <span class="faq__icon" aria-hidden="true"></span>
+            </summary>
+            <div class="faq__body">
+              <ol class="install install--compact" role="list">
               <li>
-                <p>把這段貼到網址列。這不是網頁能替你開啟的連結。</p>
+                <p>下載 <a href="/flowkite.zip" download><strong>flowkite.zip</strong></a> 並解壓縮。</p>
+              </li>
+              <li>
+                <p>開啟這個網址：</p>
                 <pre class="code"><code>chrome://extensions/</code></pre>
               </li>
-              <li><p>在右上角開啟<strong>開發人員模式</strong>。否則 Chrome 不會顯示「載入未封裝項目」按鈕。</p></li>
-              <li><p>點<strong>載入未封裝項目</strong>，選解壓縮後的資料夾本身，不是裡面的檔案。接著從上面的步驟 2 繼續。</p></li>
-            </ol>
-          </div>
-
-          <div class="cta reveal">
-            <a class="key" href="https://chromewebstore.google.com/detail/flowkite-ai-web-agent-aut/kacmblccfhnfcjfpeageldmmbkocafab" rel="noopener noreferrer">加到 Chrome</a>
-            <a class="key key--ghost" href="/flowkite.zip" download>下載 zip</a>
-          </div>
+              <li>
+                <p>開啟右上角的<strong>開發人員模式</strong>。</p>
+              </li>
+              <li>
+                <p>按<strong>載入未封裝項目</strong>，選擇解壓縮後的資料夾。</p>
+              </li>
+              </ol>
+            </div>
+          </details>
         </div>
       </section>
 
       <!-- ────────────────────────────── faq ────────────────────────────── -->
-      <section id="faq" class="section" aria-labelledby="faq-title">
+      <section id="faq" class="section section--sunk" aria-labelledby="faq-title">
         <div class="container container--narrow">
           <div class="section__head">
-            <p class="eyebrow reveal">直球回答</p>
-            <h2 id="faq-title" class="reveal">常見問題，老實回答。</h2>
+            <p class="eyebrow reveal">常見問題</p>
+            <h2 id="faq-title" class="reveal">快速解答。</h2>
           </div>
 
           <div class="faq">
             <details class="faq__item reveal" id="faq-free">
               <summary>
-                <span>它是免費的嗎？</span>
+                <span>免費嗎？</span>
                 <span class="faq__icon" aria-hidden="true"></span>
               </summary>
               <div class="faq__body">
-                <p>
-                  擴充功能免費下載，沒有付費方案、沒有試用期、不用帳號。要花錢的是模型：你帶自己的 API
-                  金鑰，供應商按代理的用量直接向你收費。透過 Ollama 跑本機模型的話，連這筆錢也歸零。
-                </p>
+                <p>是的。沒有付費方案，也不需要帳號。你只需支付 AI 供應商的用量費用，透過 Ollama 使用本機模型則完全免費。</p>
               </div>
             </details>
-
             <details class="faq__item reveal" id="faq-keys">
               <summary>
                 <span>我的 API 金鑰會去哪裡？</span>
                 <span class="faq__icon" aria-hidden="true"></span>
               </summary>
               <div class="faq__body">
-                <p>
-                  存進你電腦上的 <code>chrome.storage.local</code>，僅此而已。請求從你的瀏覽器直達你設定的供應商。
-                  Flowkite 沒有後端可以代理它們，所以不存在任何一台能看到金鑰的我方伺服器。解除安裝擴充功能，金鑰也跟著消失。
-                </p>
+                <p>金鑰留在你的瀏覽器，並直接送到你的 AI 供應商。Flowkite 沒有伺服器。</p>
               </div>
             </details>
-
-            <details class="faq__item reveal" id="faq-local-models">
-              <summary>
-                <span>支援本機模型嗎？</span>
-                <span class="faq__icon" aria-hidden="true"></span>
-              </summary>
-              <div class="faq__body">
-                <p>
-                  支援，Ollama 有直接支援，任何相容 OpenAI 的端點只要給 base URL 就能用。這種配置 API
-                  成本為零，資料完全不離開你的電腦。一個提醒：本機模型需要更明確的提示。把任務拆成清楚的步驟，別丟一句高層次的模糊指令。
-                </p>
-              </div>
-            </details>
-
-            <details class="faq__item reveal" id="faq-web-store">
-              <summary>
-                <span>上架 Chrome 線上應用程式商店了嗎？</span>
-                <span class="faq__icon" aria-hidden="true"></span>
-              </summary>
-              <div class="faq__body">
-                <p>
-                  已經上架了。從
-                  <a href="https://chromewebstore.google.com/detail/flowkite-ai-web-agent-aut/kacmblccfhnfcjfpeageldmmbkocafab" rel="noopener noreferrer">Chrome 線上應用程式商店</a>一鍵安裝，Chrome
-                  會幫你保持更新。若不想透過商店，本頁的 zip 可以用<strong>載入未封裝項目</strong>安裝——這種安裝方式升級時要替換資料夾，
-                  然後到 <code>chrome://extensions</code> 的 Flowkite 卡片上按重新整理。完整步驟見<a href="#quickstart">快速開始</a>。
-                </p>
-              </div>
-            </details>
-
             <details class="faq__item reveal" id="faq-data">
               <summary>
                 <span>哪些資料會離開我的電腦？</span>
                 <span class="faq__icon" aria-hidden="true"></span>
               </summary>
               <div class="faq__body">
-                <p>
-                  頁面結構，以及，只有你開啟視覺功能時，螢幕截圖，用你的金鑰送往你選擇的 LLM 供應商；
-                  資料到了他們那裡就適用他們的政策，所以挑一家你放心的。附帶分析金鑰的建置版本也會向 PostHog
-                  送匿名使用事件，任務開始、完成、失敗或取消，加上代理造訪的每個網域的主機名稱，在
-                  <strong>選項 → Analytics</strong> 可以關掉；你自己編譯的版本不帶金鑰，所以根本不會執行。
-                  你的設定、任務歷史、API 金鑰和記憶都留在 <code>chrome.storage.local</code>，永不上傳。
-                </p>
+                <p>只有任務需要的內容：正在處理的頁面、你開啟的分頁標題，以及開啟視覺功能時的螢幕截圖，送到你選擇的 AI 供應商。詳細內容請見<a href="/privacy-policy/" hreflang="en">隱私權政策</a>。</p>
               </div>
             </details>
-
+            <details class="faq__item reveal" id="faq-local-models">
+              <summary>
+                <span>可以使用本機模型嗎？</span>
+                <span class="faq__icon" aria-hidden="true"></span>
+              </summary>
+              <div class="faq__body">
+                <p>可以，透過 Ollama 或任何相容 OpenAI 的端點。</p>
+              </div>
+            </details>
             <details class="faq__item reveal" id="faq-browsers">
               <summary>
                 <span>支援哪些瀏覽器？</span>
                 <span class="faq__icon" aria-hidden="true"></span>
               </summary>
               <div class="faq__body">
-                <p>
-                  完整支援 Chrome 與 Edge。Firefox 與 Safari 不支援，Flowkite 是建立在 Chrome 自家 API 上的
-                  Manifest V3 擴充功能。其他 Chromium 系瀏覽器如 Brave、Arc、Opera 或許能用，但未經測試。
-                </p>
+                <p>Chrome 和 Edge。</p>
               </div>
             </details>
           </div>
@@ -756,7 +562,7 @@
             <img src="/mark.png" alt="" width="32" height="32" decoding="async" />
             <div>
               <p class="footer__name">Flowkite</p>
-              <p class="footer__meta">免費下載，採用 Apache&nbsp;2.0 授權。人在迴路中的控制，跑在你自己的 API 金鑰上。</p>
+              <p class="footer__meta">免費且開源，採用 Apache&nbsp;2.0 授權。</p>
             </div>
           </div>
 
@@ -773,9 +579,7 @@
           </nav>
         </div>
 
-        <p class="footer__fine">
-          在你的瀏覽器本機執行。沒有帳號、沒有後端，任何使用分析都可以關閉。與任何模型供應商皆無關聯。
-        </p>
+        <p class="footer__fine">在你的瀏覽器中執行。沒有帳號、沒有伺服器。與任何 AI 供應商皆無關聯。</p>
       </div>
     </footer>
 
