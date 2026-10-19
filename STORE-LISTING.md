@@ -1,6 +1,6 @@
 # Chrome Web Store listing copy
 
-Paste-ready text for the Developer Dashboard, for version 0.3.3. Field names below match the
+Paste-ready text for the Developer Dashboard, for version 0.3.4. Field names below match the
 dashboard's own. The per-permission justifications live in [PERMISSIONS.md](PERMISSIONS.md); this
 file is everything else the submission form asks for.
 
@@ -42,8 +42,9 @@ English (United States).
 
 ```
 Flowkite is a free AI agent that works inside your browser. You type a task in plain
-language — "find the cheapest AeroPress filters across three shops", "pull every invoice from
-this dashboard into a table" — and it carries the task out on the pages you already have open.
+language, such as "find the cheapest AeroPress filters across three shops" or "pull every
+invoice from this dashboard into a table", and it carries the task out on the pages you already
+have open.
 
 It asks before it acts. Flowkite shows you its plan before it touches a page, stops for your
 confirmation before anything irreversible, and hands the tab back to you when a login or a
@@ -63,10 +64,17 @@ Two agents split the work. A Planner decides the approach and shows it to you fo
 Navigator does the clicking, typing and scrolling, and reports each step in the side panel as it
 goes. An optional cheap "Fast" model can take the routine steps to keep the bill down.
 
+You can watch it work. A pointer labelled Flowkite moves to each button or field before it clicks
+or types, the page says where the agent is going before it leaves and where it landed when it
+arrives, and the side panel notes every page it moves to.
+
+One tab, one Flowkite. The panel belongs to the tab you opened it on and the agent works in that
+tab. Switch to another tab and the panel steps aside; a task that is running keeps going.
+
 WHAT YOU CONTROL
 
 • Approval mode, chosen per task in the composer: gate the plan, gate every single action
-  including navigation, or turn the gates off entirely — the last one takes an explicit
+  including navigation, or turn the gates off entirely. The last one takes an explicit
   acknowledgement that names what it switches off.
 • A firewall with allow and deny lists, checked before every navigation.
 • A budget cap in dollars, using prices you enter yourself. The task pauses and asks rather than
@@ -77,15 +85,22 @@ WHAT YOU CONTROL
 
 WHAT IT CAN DO
 
+• Skills: tested playbooks for web research, comparing prices or plans, collecting lists, filling
+  forms, summarizing a page, reading and drafting email, searching travel and checking a status.
+  Flowkite loads the one that fits the task, or you choose it by typing / and its name. Write your
+  own, or import and export them as SKILL.md files.
 • Multi-step research across several tabs, with the agent's tabs collected into one labelled tab
   group so they never get confused with yours.
 • Extract content into a real table and save it as a CSV or JSON file.
+• Crawl the linked pages of a catalog, directory or documentation site into one table, picking up
+  where it left off if the run is interrupted.
+• Paste or drop images into a task and the model can see them.
 • Reusable task templates with fill-in-the-blank slots.
 • "Ask Flowkite" on the right-click menu, for the page or your text selection, and Alt+Shift+F
   to open the panel from the keyboard.
 • Scheduled daily tasks that run unattended and notify you when they finish. Sensitive actions
   are automatically declined during those runs, because nobody is there to answer.
-• An optional outbound webhook to one URL you choose, off by default — and a separate opt-in if
+• An optional outbound webhook to one URL you choose, off by default, with a separate opt-in if
   you want the collected table sent with it.
 
 BRING YOUR OWN MODEL
@@ -96,8 +111,8 @@ leaves your machine at all.
 
 FREE TO DOWNLOAD
 
-Apache 2.0 licensed, and free with no paid tier, no trial and no account — including exactly what is
-sent, when, and to whom.
+Apache 2.0 licensed, and free with no paid tier, no trial and no account. The privacy policy
+says exactly what is sent, when, and to whom.
 
 A NOTE ON THE DEBUGGER BANNER
 
